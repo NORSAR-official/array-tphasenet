@@ -4,7 +4,7 @@
 
 Code related to the submitted paper **Adapting deep learning phase detectors for seismic array processing**.
 
-This is work in progress and will be completed until the paper is published.
+!!This is work in progress and will be completed soon and latest until the paper is published. Some code and dummy data are still missing!!
 
 Dummy training data from ARCES, SPITS and FINES arrays are provided. Complete test data and all models trained on complete training data will be uploaded here:
 

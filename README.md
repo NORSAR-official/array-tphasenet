@@ -116,3 +116,4 @@ prediction.detect_only : True
 To be added:
 - evaluation of contineous processing results
 - contineous processing using beam detection
+- contineous processing using array detection

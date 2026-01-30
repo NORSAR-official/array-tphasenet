@@ -235,12 +235,6 @@ dataset = cfg.data.input_dataset_name
 # Build experiment name from configuration parameters
 setting = f'{dataset}_{model_type}'
 
-if cfg.training.use_beam_as_label:
-    if 'ADD' in cfg.training.use_beam_as_label:
-        setting = f'{dataset}_addbeamlabel_{model_type}'
-    else:
-        setting = f'{dataset}_beamlabel_{model_type}'
-        
 if cfg.data.holdout:
     setting = f'{dataset}_holdout_{model_type}'
     

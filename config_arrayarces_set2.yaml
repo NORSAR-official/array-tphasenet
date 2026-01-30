@@ -1,0 +1,99 @@
+run:
+  outputdir: './output/'
+  code_location: './'
+  only_predict: False
+  predict_with_other_model : False
+  gpu: False
+data:
+  input_dataset_name: 'arces25'
+  input_datatype: 'array_waveforms'
+  inputdir: './data/'  # place to save one year of data downloaded from https://doi.org/10.17605/OSF.IO/27FPK
+  train_years: [2022]
+  valid_years: [2022]
+  test_years: [2022]
+  sampling_rate : 40.
+  allowed_phases : ['PN', 'PG', 'P', 'SN', 'SG', 'S', 'PB', 'SB','D']
+  holdout : False # file with list of event IDs to be hold out during training and used during testing. You need to adjust years accordingly
+# Following are only needed for array detection model
+# complete training dataset channels as saved in data/
+  use_these_arraystations : [['ARA0','3c'],['ARA1','1c'],['ARA2','1c'],['ARA3','1c'],['ARB1','1c'],['ARB2','1c'],['ARB3','1c'],['ARB4','1c'],['ARB5','1c'],['ARC1','1c'],['ARC3','1c'],['ARC4','3c'],['ARC5','1c'],['ARC6','1c'],['ARC7','3c'],['ARD1','1c'],['ARD3','1c'],['ARD5','1c'],['ARD7','1c']]
+  # subset of list above used for training this model
+  extract_array_channels : [['ARA1','1c'],['ARA2','1c'],['ARA3','1c'],['ARB1','1c'],['ARB2','1c'],['ARB3','1c'],['ARB4','1c'],['ARB5','1c'],['ARC4','3c']]
+  setname : 'arces_set2'
+  lower_frequency : 2.0
+  upper_frequency : 8.0
+training:
+  reduce_lr_patience: 9
+  early_stopping_patience: 15
+#  epochs: 200
+  epochs: 1 # for the dummy data set on GitHub
+#  batch_size: 32
+  batch_size: 10 # for the dummy data set on GitHub
+  weight_decay: 0.1
+  learning_rate: 0.001
+  class_weights: [0.05,0.40,0.55] # noise, P, S
+  optimizer: 'adam'
+  l1_norm: 0.0
+  l2_norm: 0.0
+  dropout: 0.4
+normalization:
+  mode: 'std'
+  channel_mode: 'global'
+augment:
+  ramp: 11
+  add_noise: 0.3
+  add_event: 0.3
+  drop_channel: 0.2
+  add_gap:  0.2
+  max_gap_size: 0.1
+  new_size: 300
+  taper: 0.01
+model:
+  type: 'transphasenet'
+  residual_attention: [0,0,0,8,16,32,64]
+  filters: [64,64,128,128,256,256,512]
+  kernel_sizes: [7,7,7,7,7,7,7]
+  pooling_type: 'max'
+  activation: 'swish'
+  att_type: 'across'
+  rnn_type: 'lstm'
+  additive_att: False
+evaluation:
+  optimal_threshold: True
+  dt: 2.0
+  dt_cont: 4.0
+  p_threshold: 0.55 
+  s_threshold: 0.35 
+  save_fig: True
+  overall_performance: True
+  vs_metadata: False # 'distance' 'station' or 'catalog'
+  snr_threshold: False 
+#  snr_threshold: [2.0,99999] # False or values [minsnr,maxsnr]
+#  snr_mode: 'max' # use max SNR of all arrivals from an event and keep all if above threshold
+#    snr_mode: 'min' # use min SNR of all arrivals from an event and keep all if above threshold
+  unpicked : False
+  common_events_with_model: False
+  theoretical_arrivals : False 
+  picks: './data/manual_picks_arces.dat'
+prediction:
+  predict: True 
+  stations: ['ARCES']
+  start_time: '2023-01-01T00:00:00'
+  end_time: '2023-01-05T00:00:00'
+  window_length: 3600
+  step: 10 
+  stacking: 'median'
+  output_dir: './output/contineous/'
+  save_prob: True 
+  save_waveforms: False 
+  save_picks: False 
+# This option is also used for test data in case of ensemble detection
+  combine_array_stations: False
+  combine_beams: False
+  detect_only: False 
+  num_processes: 8 
+  p_beam_vel: 6.45 
+  s_beam_vel: 3.7 
+  vote_threshold_p: 0.35
+  vote_threshold_s: 0.25
+  skip_stations : ['ARC2']

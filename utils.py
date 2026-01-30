@@ -1064,7 +1064,7 @@ def combine_phase_detections(pred_stream,array,baz,cfg_pred,cfg,geometry=None,co
         Back-azimuth (degrees) for beamforming, None for grid search
     cfg_pred : namespace
         Prediction configuration with:
-        - combine_array_stations : List of methods ['stack', 'vote', 'beam']
+        - combine_array_stations : Method string ('stack', 'vote', 'beam') or False
         - combine_beams : Use max beam combination
         - p_beam_vel, s_beam_vel : Beamforming velocities (float or list of floats)
         - azimuths : List of back-azimuths [deg] (optional, default 0-360 step 30)
@@ -1074,7 +1074,7 @@ def combine_phase_detections(pred_stream,array,baz,cfg_pred,cfg,geometry=None,co
         Model configuration
     geometry : dict or None, default=None
         Station geometry for beamforming as {station_code: {'dx': km, 'dy': km}}.
-        Required if 'beam' is in combine_array_stations.
+        Required if combine_array_stations is 'beam'.
     cont : True if evaluation on contineous data
     
     Returns
@@ -1096,94 +1096,94 @@ def combine_phase_detections(pred_stream,array,baz,cfg_pred,cfg,geometry=None,co
         st_comb = st_comb.trim(UTCDateTime(cfg_pred.start_time),UTCDateTime(cfg_pred.end_time))
         return st_comb
 
-    for comb in cfg_pred.combine_array_stations :
-        if comb == 'stack' or \
-           (comb == 'beam' and \
-           (len(pred_stream.select(channel='P')) < 2 or \
-            len(pred_stream.select(channel='S')) < 2)) :
+    comb = cfg_pred.combine_array_stations
+    if comb == 'stack' or \
+       (comb == 'beam' and \
+       (len(pred_stream.select(channel='P')) < 2 or \
+        len(pred_stream.select(channel='S')) < 2)) :
 
-            st = pred_stream.copy().select(channel='P').stack()
-            st += pred_stream.copy().select(channel='S').stack()
-            for tr in st : tr.stats.station = 'STACK'
-            st_comb += st
-            bazlist=[None]
-        elif comb == 'vote' :
+        st = pred_stream.copy().select(channel='P').stack()
+        st += pred_stream.copy().select(channel='S').stack()
+        for tr in st : tr.stats.station = 'STACK'
+        st_comb += st
+        bazlist=[None]
+    elif comb == 'vote' :
 
-            st = Stream()
-            st += voting(pred_stream.copy().select(channel='P'),cfg_pred.vote_threshold_p)
-            st += voting(pred_stream.copy().select(channel='S'),cfg_pred.vote_threshold_s)
-            for tr in st : tr.stats.station = 'VOTE'
-            st_comb += st
+        st = Stream()
+        st += voting(pred_stream.copy().select(channel='P'),cfg_pred.vote_threshold_p)
+        st += voting(pred_stream.copy().select(channel='S'),cfg_pred.vote_threshold_s)
+        for tr in st : tr.stats.station = 'VOTE'
+        st_comb += st
 
-        elif comb == 'beam' :
-            from beamforming import compute_beam_time_delays, create_beam
-            if geometry is None:
-                raise ValueError("geometry dict required for beamforming. "
-                                 "Provide station offsets as {station: {'dx': km, 'dy': km}}")
-            # Get azimuth list: use provided baz, or config azimuths, or default grid
-            if baz:
-                bazlist = [baz]
-            elif hasattr(cfg_pred, 'azimuths') and cfg_pred.azimuths:
-                bazlist = list(cfg_pred.azimuths)
-            else:
-                bazlist = list(range(0, 360, 30))
-            
-            # Normalize velocities to lists (backwards compatible with single float)
-            p_beam_vel = cfg_pred.p_beam_vel
-            s_beam_vel = cfg_pred.s_beam_vel
-            if isinstance(p_beam_vel, (int, float)):
-                p_vel_list = [p_beam_vel]
-            else:
-                p_vel_list = list(p_beam_vel)
-            if isinstance(s_beam_vel, (int, float)):
-                s_vel_list = [s_beam_vel]
-            else:
-                s_vel_list = list(s_beam_vel)
-            
-            # force same start time
-            for tr in pred_stream : tr.stats.starttime = pred_stream[0].stats.starttime
-            st = Stream()
-            # Create beams for all azimuth and velocity combinations
-            for baz_val in bazlist :
-                for p_vel in p_vel_list:
-                    time_delays = compute_beam_time_delays(geometry, azimuth_deg=baz_val, velocity_km_sec=p_vel)
-                    p_beam = create_beam(pred_stream.select(channel='P'), time_delays=time_delays, station_name='BEAM')
-                    st += p_beam
-                for s_vel in s_vel_list:
-                    time_delays = compute_beam_time_delays(geometry, azimuth_deg=baz_val, velocity_km_sec=s_vel)
-                    s_beam = create_beam(pred_stream.select(channel='S'), time_delays=time_delays, station_name='BEAM')
-                    st += s_beam
-                for tr in st :
-                    tr.data = tr.data[:len(pred_stream[0].data)]
-            if len(bazlist)>1 or len(p_vel_list)>1 or len(s_vel_list)>1: 
-                st_comb += get_max_beam(st)
-            else : 
-                st_comb += st
-
+    elif comb == 'beam' :
+        from beamforming import compute_beam_time_delays, create_beam
+        if geometry is None:
+            raise ValueError("geometry dict required for beamforming. "
+                             "Provide station offsets as {station: {'dx': km, 'dy': km}}")
+        # Get azimuth list: use provided baz, or config azimuths, or default grid
+        if baz:
+            bazlist = [baz]
+        elif hasattr(cfg_pred, 'azimuths') and cfg_pred.azimuths:
+            bazlist = list(cfg_pred.azimuths)
+        else:
+            bazlist = list(range(0, 360, 30))
+        
+        # Normalize velocities to lists (backwards compatible with single float)
+        p_beam_vel = cfg_pred.p_beam_vel
+        s_beam_vel = cfg_pred.s_beam_vel
+        if isinstance(p_beam_vel, (int, float)):
+            p_vel_list = [p_beam_vel]
+        else:
+            p_vel_list = list(p_beam_vel)
+        if isinstance(s_beam_vel, (int, float)):
+            s_vel_list = [s_beam_vel]
+        else:
+            s_vel_list = list(s_beam_vel)
+        
+        # force same start time
+        for tr in pred_stream : tr.stats.starttime = pred_stream[0].stats.starttime
+        st = Stream()
+        # Create beams for all azimuth and velocity combinations
+        for baz_val in bazlist :
+            for p_vel in p_vel_list:
+                time_delays = compute_beam_time_delays(geometry, azimuth_deg=baz_val, velocity_km_sec=p_vel)
+                p_beam = create_beam(pred_stream.select(channel='P'), time_delays=time_delays, station_name='BEAM')
+                st += p_beam
+            for s_vel in s_vel_list:
+                time_delays = compute_beam_time_delays(geometry, azimuth_deg=baz_val, velocity_km_sec=s_vel)
+                s_beam = create_beam(pred_stream.select(channel='S'), time_delays=time_delays, station_name='BEAM')
+                st += s_beam
+            for tr in st :
+                tr.data = tr.data[:len(pred_stream[0].data)]
+        if len(bazlist)>1 or len(p_vel_list)>1 or len(s_vel_list)>1: 
+            st_comb += get_max_beam(st)
         else : 
-            print("Not implemented")
-            exit()
+            st_comb += st
+
+    else : 
+        print("Not implemented")
+        exit()
+
+    # Trimming and alignment for continuous data
+    if cont:
+        # Initial trim to requested time range
+        st_comb = st_comb.trim(UTCDateTime(cfg_pred.start_time), UTCDateTime(cfg_pred.end_time))
+
+        # Ensure all traces have exactly the same start and end times
+        if len(st_comb) > 0:
+            # Find common time window (latest start, earliest end)
+            common_start = max([tr.stats.starttime for tr in st_comb])
+            common_end = min([tr.stats.endtime for tr in st_comb])
+
+            # Trim all traces to common time window
+            st_comb = st_comb.trim(common_start, common_end)
+
+            # Verify all traces now have the same length
+            lengths = [tr.stats.npts for tr in st_comb]
+            if len(set(lengths)) > 1:
+                print(f"WARNING: Traces have different lengths after alignment: {set(lengths)}")
+                print(f"         Common window: {common_start} to {common_end}")
         st_comb.plot()
-
-        # Trimming and alignment for continuous data
-        if cont:
-            # Initial trim to requested time range
-            st_comb = st_comb.trim(UTCDateTime(cfg_pred.start_time), UTCDateTime(cfg_pred.end_time))
-
-            # Ensure all traces have exactly the same start and end times
-            if len(st_comb) > 0:
-                # Find common time window (latest start, earliest end)
-                common_start = max([tr.stats.starttime for tr in st_comb])
-                common_end = min([tr.stats.endtime for tr in st_comb])
-
-                # Trim all traces to common time window
-                st_comb = st_comb.trim(common_start, common_end)
-
-                # Verify all traces now have the same length
-                lengths = [tr.stats.npts for tr in st_comb]
-                if len(set(lengths)) > 1:
-                    print(f"WARNING: Traces have different lengths after alignment: {set(lengths)}")
-                    print(f"         Common window: {common_start} to {common_end}")
 
     return st_comb
 
@@ -1212,7 +1212,7 @@ def group_and_combine_phase_detections(p_pred,s_pred,ids,ids_stat,stations,cfg,c
         Prediction configuration with combine_array_stations settings
     array_geometries : dict
         Array geometries for beamforming as {array_name: {station: {'dx': km, 'dy': km}}}.
-        Required if 'beam' is in combine_array_stations.
+        Required if combine_array_stations is 'beam'.
         Example: {'ARCES': {'ARA0': {'dx': 0.0, 'dy': 0.0}, 'ARA1': {'dx': 0.5, 'dy': 0.3}}}
     baz : array-like
         Back-azimuths for each event
@@ -1252,14 +1252,13 @@ def group_and_combine_phase_detections(p_pred,s_pred,ids,ids_stat,stations,cfg,c
             for i in idx :
                 pred_stream += make_trace(stations[i],'P',np.squeeze(p_pred[i]),UTCDateTime(),cfg.data.sampling_rate)
                 pred_stream += make_trace(stations[i],'S',np.squeeze(s_pred[i]),UTCDateTime(),cfg.data.sampling_rate)
-            print('Combining',len(pred_stream),'station for array',array,evid)
-            if cfg_pred.combine_array_stations[0] == "beam" :
+            if cfg_pred.combine_array_stations == "beam" :
                 geometry = array_geometries.get(array) if array_geometries else None
                 st_comb=combine_phase_detections(pred_stream,array,baz[idx[0]],cfg_pred,cfg,geometry=geometry)
             else :
                 st_comb=combine_phase_detections(pred_stream,array,False,cfg_pred,cfg)
-            if len(st_comb.select(station=cfg_pred.combine_array_stations[0]).select(channel='P')) == 0 : continue
-            p_pred_new.append(st_comb.select(station=cfg_pred.combine_array_stations[0]).select(channel='P')[0].data)
-            s_pred_new.append(st_comb.select(station=cfg_pred.combine_array_stations[0]).select(channel='S')[0].data)
+            if len(st_comb.select(station=cfg_pred.combine_array_stations.upper()).select(channel='P')) == 0 : continue
+            p_pred_new.append(st_comb.select(station=cfg_pred.combine_array_stations.upper()).select(channel='P')[0].data)
+            s_pred_new.append(st_comb.select(station=cfg_pred.combine_array_stations.upper()).select(channel='S')[0].data)
             idx_new.append(idx[0]) # <- good if this is central element
     return np.array(p_pred_new),np.array(s_pred_new),idx_new

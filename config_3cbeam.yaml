@@ -1,0 +1,93 @@
+run:
+  outputdir: './output/'
+  code_location: './'
+  only_predict: False
+  predict_with_other_model : False
+  gpu: False
+data:
+  input_dataset_name: '3cbeam'
+  input_datatype: 'beams'
+  inputdir: './data/'  # place to save one year of data downloaded from https://doi.org/10.17605/OSF.IO/27FPK
+  train_years: [2022]
+  valid_years: [2022]
+  test_years: [2022]
+  sampling_rate : 40.
+  allowed_phases : ['PN', 'PG', 'P', 'SN', 'SG', 'S', 'PB', 'SB','D'] #  phase types to be used as labels
+  holdout : False
+training:
+  reduce_lr_patience: 9
+  early_stopping_patience: 15
+#  epochs: 200
+  epochs: 1
+#  batch_size: 32
+  batch_size: 10
+  weight_decay: 0.1
+  learning_rate: 0.001
+  class_weights: [0.05,0.40,0.55] # noise, P, S
+  optimizer: 'adam'
+  l1_norm: 0.0
+  l2_norm: 0.0
+  dropout: 0.4
+  probabilistic: False,
+  probabilistic_samples: 10,
+normalization:
+  mode: 'std'
+  channel_mode: 'global'
+augment:
+  ramp: 11
+  add_noise: 0.3
+  add_event: 0.3
+  drop_channel: 0.2
+  add_gap:  0.2
+  max_gap_size: 0.1
+  new_size: 300
+  taper: 0.01
+model:
+  type: 'transphasenet'
+  residual_attention: [0,0,0,8,16,32,64]
+  filters: [64,64,128,128,256,256,512]
+  kernel_sizes: [7,7,7,7,7,7,7]
+  pooling_type: 'max'
+  activation: 'swish'
+  att_type: 'across'
+  rnn_type: 'lstm'
+  additive_att: False
+evaluation:
+  optimal_threshold: True 
+  dt: 2.0 
+  dt_cont: 4.0 
+  p_threshold: 0.55 
+  s_threshold: 0.4
+  save_fig: True
+  overall_performance: True
+  vs_metadata: False # 'distance' 'station' or 'catalog'
+  snr_threshold: False # False or value
+  unpicked : False
+#  snr_mode: 'max' # use max SNR of all arrivals from an event and keep all if above threshold
+#  snr_mode: 'min' # use min SNR of all arrivals from an event and keep all if above threshold
+  common_events_with_model: False
+  picks : './data/manual_picks_arces.data'
+  theoretical_arrivals : False
+prediction:
+  predict: True
+  stations: ['ARCES']
+  start_time: '2023-01-01T00:00:00'
+  end_time: '2023-01-05T00:00:00'
+  window_length: 3600
+  step: 10 # sliding window step in seconds
+  stacking: 'median'
+  output_dir: './output/contineous/'
+  save_prob: True 
+  save_waveforms: False
+  save_picks: False
+# This option is also used for test data in case of ensemble detection
+  combine_array_stations: False 
+  combine_beams: False
+  detect_only: False 
+  num_processes: 8 
+  vote_threshold_p: 0.35
+  vote_threshold_s: 0.25 
+  skip_stations : ['ARC2']
+  azimuths: [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330]
+  p_beam_vel: [5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5] # km/s for P-wave beamforming
+  s_beam_vel: 3.7

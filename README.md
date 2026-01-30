@@ -6,7 +6,7 @@ Code related to the submitted paper **Adapting deep learning phase detectors for
 
 This is work in progress and will be completed until the paper is published.
 
-Dummy training data from ARCES, SPITS and FINES arrays are provided. Complete test data will be uploaded here:
+Dummy training data from ARCES, SPITS and FINES arrays are provided. Complete test data and all models trained on complete training data will be uploaded here:
 
 https://doi.org/10.17605/OSF.IO/27FPK
 
@@ -19,8 +19,10 @@ pip3 install -r requirements.txt
 
 ```
 
-Edit config.yaml to choose type of input data, type of model, etc.
+Edit config file to choose type of input data, type of model, etc.
 Several model config files are also provided.
+
+Note that only config_1stat.yaml includes complete explanations for each parameter.
 
 ## Single station detection
 
@@ -31,7 +33,11 @@ python train.py --config config_1stat.yaml
 
 ```
 
+If you want to train on a more complete dataset, download data from link above (same for al other models below).
+
 Create evaluation metrics and plots on test data:
+
+To generate meaningful results, you should download the test data predictions (year 2022) from the data repository and save under output/predictions/.
 
 ```
 python evaluate_on_testdata.py --config config_1stat.yaml
@@ -41,6 +47,8 @@ python evaluate_on_testdata.py --config config_1stat.yaml
 ## Ensemble detection
 
 Apply single station model to all array stations in test data for ensemble detection:
+
+To generate meaningful results, you should download the model trained on multy year data from the data repository and save under output/models/.
 
 
 ```
@@ -101,12 +109,12 @@ Im model_configs/config_1stat.yaml set :
 
 prediction.predict : True # run on contineous data
 
-prediction.combine_array_stations : ['stack'] # do post-processing (stacking)
+prediction.combine_array_stations : 'stack' # do post-processing (stacking)
 
 prediction.stations: ['ARCES'] # use all ARCES stations
 
 ```
-python predict_contineous.py --config config_1stat.yaml
+python predict_contineous.py --config config_1statfullarray_cont.yaml
 ```
 
 Do not write detection time series for each station, but combine and write only phase detectiobs (only works for stacking option):

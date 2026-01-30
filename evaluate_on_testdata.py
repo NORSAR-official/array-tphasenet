@@ -66,7 +66,6 @@ Training Config (e.g., config.yaml):
     - model.type: Model architecture (transphasenet, splitoutput*, etc.)
     - data.input_dataset_name: Dataset identifier
     - data.test_years: Years to evaluate
-    - training.use_beam_as_label: Enable beam label mode
     - normalization.channel_mode: Normalization strategy
     - run.outputdir: Output directory for results
 
@@ -123,7 +122,6 @@ Figures:
 Notes
 -----
 - Config file can be specified via --config command-line argument
-- Beam label mode (cfg.training.use_beam_as_label) exits after visualization
 - Some features require metadata CSV files in specific locations
 - Array station grouping with beamforming requires array geometry configuration
 - Run with --help to see command-line options
@@ -344,10 +342,6 @@ if __name__ == '__main__':
     else : 
         model = f'{cfg.data.input_dataset_name}_{cfg.model.type}'
     
-    # Modify for beam label training
-    if cfg.training.use_beam_as_label :
-        model = f'{cfg.data.input_dataset_name}_beamlabel_{cfg.model.type}'
-    
     # Modify for holdout evaluation
     if cfg.data.holdout :
         model = f'{cfg.data.input_dataset_name}_holdout2_{cfg.model.type}'
@@ -391,7 +385,6 @@ if __name__ == '__main__':
     # Extract data from prediction file
     true = pred['y']         # Ground truth labels
     ids = pred['ids']        # Event IDs
-    x = pred['x']            # Input waveforms
     
     # Process station names
     stations = np.array([stat.decode("utf-8") for stat in pred['stations']])
@@ -415,37 +408,7 @@ if __name__ == '__main__':
     # MODEL-SPECIFIC OUTPUT PROCESSING
     # ═══════════════════════════════════════════════════════════════════════════
     
-    # SPECIAL CASE: Beam label visualization mode
-    # If training used beam labels, enter diagnostic visualization mode
-    # This plots waveforms and predicted/observed beam responses, then exits
-    if cfg.training.use_beam_as_label :
-        # Split into P and S beam components
-        p_yte, s_yte = np.split(true, 2, axis=-1)
-        p_pred, s_pred = np.split(pred, 2, axis=-1)
-        
-        # Plot each event: 9 waveform channels + P/S beam predictions
-        for pt,st,p,s,a in zip(p_yte,s_yte,p_pred,s_pred,x):
-            a=np.transpose(a)
-            # Plot waveforms (stacked and offset for visibility)
-            plt.plot(a[0]/np.max(a[0])-2,c='black')
-            plt.plot(a[1]/np.max(a[0])-3,c='black')
-            plt.plot(a[2]/np.max(a[0])-4,c='black')
-            plt.plot(a[3]/np.max(a[0])-5,c='black')
-            plt.plot(a[4]/np.max(a[0])-6,c='black')
-            plt.plot(a[5]/np.max(a[0])-7,c='black')
-            plt.plot(a[6]/np.max(a[0])-8,c='black')
-            plt.plot(a[7]/np.max(a[0])-9,c='black')
-            plt.plot(a[8]/np.max(a[0])-10,c='black')
-            # Plot beam labels and predictions
-            plt.plot(pt/np.max(pt),label='Observed P beam')
-            plt.plot((p-np.mean(p))/np.max((p-np.mean(p))),label='Predicted P beam')
-            plt.plot((s-np.mean(s))/np.max((s-np.mean(s)))+2,label='Predicted S beam')
-            plt.plot(st/np.max(st)+2,label='Observed S beam')
-            plt.legend()
-            plt.show()
-        exit()  # Exit after visualization
-    
-    # STANDARD CASE: Split predictions by model type
+    # Split predictions by model type
     # Different model architectures have different output channel layouts
     if cfg.model.type.startswith('splitoutput'):
         # Split-output models: [p_noise, p_pick, s_noise, s_pick]
@@ -469,7 +432,7 @@ if __name__ == '__main__':
     # - SNR filtering (snr_threshold)
     
     if (cfg.evaluation.vs_metadata or cfg.evaluation.theoretical_arrivals or 
-        (cfg_pred.combine_array_stations and 'beam' in cfg_pred.combine_array_stations) or cfg.evaluation.snr_threshold):
+        (cfg_pred.combine_array_stations and cfg_pred.combine_array_stations == 'beam') or cfg.evaluation.snr_threshold):
         df, arrival_ids_csv = load_metadata(cfg, events)
     else:
         df, arrival_ids_csv = None, None
@@ -482,7 +445,7 @@ if __name__ == '__main__':
     if cfg_pred.combine_array_stations :
         # Map back-azimuth information for array processing
         # this is for main event - not for added overlapping arrivals !
-        if 'beam' in cfg_pred.combine_array_stations :
+        if cfg_pred.combine_array_stations == 'beam' :
             idx = [arrival_ids_csv.index(arids.decode("utf-8").strip().split(',')[0]) for arids in events.arrival_id]
             events.baz = df['baz'][idx].values
             # Load array geometries from JSON file
@@ -494,7 +457,7 @@ if __name__ == '__main__':
             except FileNotFoundError as e:
                 print(f"WARNING: Could not load array geometries: {e}")
                 print("Falling back to stack method instead.")
-                cfg_pred.combine_array_stations = ['stack']
+                cfg_pred.combine_array_stations = 'stack'
                 array_geometries = None
         else :
             array_geometries = None
@@ -507,7 +470,7 @@ if __name__ == '__main__':
         print("Events after array grouping:",len(p_pred))
         
         # Add grouping method to output filename
-        suffix += '_'+cfg_pred.combine_array_stations[0]
+        suffix += '_'+cfg_pred.combine_array_stations
         
         # Filter events and labels to matched indices
         events.remove_events(idx)

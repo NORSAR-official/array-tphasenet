@@ -767,8 +767,6 @@ class EQDatareader(tf.keras.utils.Sequence):
         Width of Gaussian kernel for label smoothing (0 = no smoothing).
     shuffle : bool, default=False
         Shuffle samples at each epoch.
-    beamlabel : bool or str, default=False
-        Use beam-formed data as labels.
     holdout : bool or list, default=False
         Event IDs to hold out from training.
     extract_array_channels : bool or list, default=False
@@ -825,7 +823,6 @@ class EQDatareader(tf.keras.utils.Sequence):
          ramp=0,
          file_buffer=-1,
          shuffle=False,
-         beamlabel=False,
          holdout=False,
          extract_array_channels=False,
          remove_zero_channels=True,
@@ -858,7 +855,6 @@ class EQDatareader(tf.keras.utils.Sequence):
         self.f = gaussian(201, ramp)
         self.file_buffer = file_buffer
         self.files = files
-        self.beamlabel = beamlabel
         self.modeltype = modeltype  # Set modeltype as instance variable
         self.smart_crop = smart_crop  # Set smart_crop as instance variable
         self.use_overlapping_windows = use_overlapping_windows
@@ -877,10 +873,10 @@ class EQDatareader(tf.keras.utils.Sequence):
         if self.file_buffer < 0:
             if not self.include_noise:
                 for file,file_labels in tqdm(zip(self.files[0],self.files[1]),total=len(self.files[0])):
-                    self._load_file([file,file_labels,None],self.beamlabel,holdout,extract_array_channels,remove_zero_channels)
+                    self._load_file([file,file_labels,None],holdout,extract_array_channels,remove_zero_channels)
             else :
                 for file,file_labels,file_noise in tqdm(zip(self.files[0],self.files[1],self.files[2]),total=len(self.files[0])):
-                    self._load_file([file,file_labels,file_noise],self.beamlabel,holdout,extract_array_channels,remove_zero_channels)
+                    self._load_file([file,file_labels,file_noise],holdout,extract_array_channels,remove_zero_channels)
         print('Number of samples:', len(self.data))
         
         # Note: Overlapping windows are now created on-demand during training
@@ -953,24 +949,17 @@ class EQDatareader(tf.keras.utils.Sequence):
         return prob
 
 
-    def _load_file(self, filename, beamlabel,holdout=False,extract_array_channels=False,remove_zero_channels=True):
+    def _load_file(self, filename, holdout=False,extract_array_channels=False,remove_zero_channels=True):
         with h5py.File(filename[0]) as f:
             x = f['X'][:]
             ids = f['event_id'][:]
             arrival_ids = f['arrivals'][:]
             stations = f['station'][:]
-        if not beamlabel or 'ADD' in beamlabel :
-            with h5py.File(filename[1]) as f:
-                labels = f['labels'][:]
-                ids2 = f['event_id'][:]
-        if beamlabel  :
-            inputdir = '/'.join(filename[0].split('/')[:-1])
-            with h5py.File('_'.join([inputdir+'/'+beamlabel.split('_')[1]]+[filename[0].split('_')[1]]+['beams.hdf5'])) as f:
-                labels_2 = f['X'][:]
-                ids2_2 = f['event_id'][:]
-                stations2 = f['station'][:]
+        with h5py.File(filename[1]) as f:
+            labels = f['labels'][:]
+            ids2 = f['event_id'][:]
         decoded = False
-        if not np.array_equal(ids,ids2) and ( not beamlabel or 'ADD' in  beamlabel ) :
+        if not np.array_equal(ids,ids2):
             print(f"Data and labels are not equal {len(ids)} {len(ids2)}")
             print('Attempting to find same event IDs in labels as in data ...')
             num_labels = np.max(np.transpose(labels)[3])
@@ -985,7 +974,7 @@ class EQDatareader(tf.keras.utils.Sequence):
             else :
                 print('Not all event IDs in data found in labels')
                 exit()
-        if (not beamlabel or 'ADD' in beamlabel ) and not decoded :
+        if not decoded :
             num_labels = np.max(np.transpose(labels)[3])
             if self.is_dual_decoder :
                 labels = self._label_decoder_splitmodel(labels,len(x),len(x[0]),num_labels+1)
@@ -1020,13 +1009,7 @@ class EQDatareader(tf.keras.utils.Sequence):
                 if _id.decode("utf-8") not in holdout and self.testing :
                     #print('Leaving out event for testing',_id)
                     continue
-            if beamlabel :
-                idx=np.where((ids2_2 ==_id) & (stations2 == stat))[0]
-                if len(idx) == 0 : continue
-                label2=labels_2[idx][0]
-
-
-            if (not beamlabel or 'ADD' in beamlabel) and self.ramp > 0:
+            if self.ramp > 0:
                 if self.is_dual_decoder:
                     # For split output model, we need to create 4 channels:
                     # [p_noise, p_pick, s_noise, s_pick]
@@ -1048,9 +1031,6 @@ class EQDatareader(tf.keras.utils.Sequence):
                     # Single-head approach: original smoothing
                     label = label_smoothing(label, self.f)
                     label = np.clip(label, 0.0, 1.0)  # be safe
-
-            if beamlabel :
-                if 'ADD' in beamlabel : label = np.concatenate((label,label2),axis=1)
 
             # Store original waveform for lazy loading (overlapping windows created on-demand)
             self.data.append({'x':waveform.astype(np.float32), 
@@ -1096,7 +1076,7 @@ class EQDatareader(tf.keras.utils.Sequence):
     def on_epoch_end(self):
         if self.file_buffer > 0:
             for file in choices(self.files, k=self.file_buffer):
-                self._load_file(file,self.beamlabel,holdout)
+                self._load_file(file)
                 
         self.indexes = np.arange(len(self.data))
         if self.shuffle:
@@ -1389,8 +1369,6 @@ class DropDetection(tf.keras.utils.Sequence):
         Sample weights for each class [noise, P, S] for loss computation.
     distance_weighting : bool, default=False
         Apply distance-based weighting to samples.
-    beamlabel : bool or str, default=False
-        Using beam-formed labels flag.
     modeltype : str, default='transphasenet'
         Model architecture type. 'splitoutput*' models get special
         label formatting with separate P and S branches.
@@ -1410,12 +1388,10 @@ class DropDetection(tf.keras.utils.Sequence):
                  s_classes,
                  class_weights=None,
                  distance_weighting=False,
-                 beamlabel=False,
                  modeltype='transphasenet'):
         self.super_sequence = super_sequence
         self.p_classes = p_classes
         self.s_classes = s_classes
-        self.beamlabel = beamlabel
         self.class_weights = class_weights
         self.distance_weighting = distance_weighting
         self.modeltype = modeltype
@@ -1441,15 +1417,7 @@ class DropDetection(tf.keras.utils.Sequence):
         # Distance-based weighting placeholder
         dist_w = np.ones((len(batch_x),), dtype=np.float32)
 
-        # 1) If beamlabel but no 'ADD', we assume 2-channel single-head
-        if self.beamlabel and 'ADD' not in str(self.beamlabel):
-            y = np.asarray(batch_y, dtype=np.float32)
-            if not self._has_printed_debug:
-                print(f"[DEBUG] beamlabel w/o ADD => y.shape={y.shape}")
-            sw = np.ones((len(batch_x), y.shape[1]), dtype=np.float32) * dist_w[:, None]
-            return batch_x, y, sw
-
-        # 2) Multi-head if 'splitoutputtransphasenet'
+        # Multi-head if 'splitoutputtransphasenet'
         if self.modeltype.startswith('splitoutput'):
             if isinstance(batch_y, dict):
                 lab = batch_y.get('labels', None)
@@ -1545,26 +1513,19 @@ class DropDetection(tf.keras.utils.Sequence):
             self.__class__._has_printed_debug = True
             return batch_x, (p_label, s_label), (sw_p, sw_s)
 
-        # 3) Single-head phasenet with or without beams
-        if isinstance(batch_y, dict) and 'labels' in batch_y and 'beams' in batch_y and 'ADD' in str(self.beamlabel):
-            lab = np.asarray(batch_y['labels'], dtype=np.float32)
-            bms = np.asarray(batch_y['beams'], dtype=np.float32)
-            if not self._has_printed_debug:
-                print(f"[DEBUG] single-head w/ beams => lab={lab.shape}, beams={bms.shape}")
-            y = np.concatenate([lab, bms], axis=-1)
-        else:
-            y = np.asarray(batch_y, dtype=np.float32)
-            if not self._has_printed_debug:
-                print(f"[DEBUG] single-head => y.shape={y.shape}")
+        # Single-head phasenet
+        y = np.asarray(batch_y, dtype=np.float32)
+        if not self._has_printed_debug:
+            print(f"[DEBUG] single-head => y.shape={y.shape}")
 
-            # Attempt transpose fix if user data is 4D (channels, batch, time, 1)
-            if y.ndim == 4 and y.shape[1] == len(batch_x) and y.shape[0] != len(batch_x):
-                if not self._has_printed_debug:
-                    print(f"[DEBUG] Reordering single-head y from {y.shape} to fix transposition")
-                y = np.transpose(y, (1, 2, 0, 3))  # => (batch, time, channels, 1)
-                y = np.squeeze(y, axis=-1)  # => (batch, time, channels)
-                if not self._has_printed_debug:
-                    print(f"[DEBUG] y after transpose => shape={y.shape}")
+        # Attempt transpose fix if user data is 4D (channels, batch, time, 1)
+        if y.ndim == 4 and y.shape[1] == len(batch_x) and y.shape[0] != len(batch_x):
+            if not self._has_printed_debug:
+                print(f"[DEBUG] Reordering single-head y from {y.shape} to fix transposition")
+            y = np.transpose(y, (1, 2, 0, 3))  # => (batch, time, channels, 1)
+            y = np.squeeze(y, axis=-1)  # => (batch, time, channels)
+            if not self._has_printed_debug:
+                print(f"[DEBUG] y after transpose => shape={y.shape}")
 
         sw = np.ones((len(batch_x), y.shape[1]), dtype=np.float32) * dist_w[:, None]
 
@@ -1589,10 +1550,6 @@ class DropDetection(tf.keras.utils.Sequence):
             
         distance_weight = np.ones((len(batch_x), 1))
 
-        if self.beamlabel and 'ADD' not in self.beamlabel :
-            y = np.concatenate([batch_y[0],batch_y[1]], axis=-1)
-            return batch_x, y, distance_weight
-
         p = np.concatenate([batch_y[i] for i in self.p_classes], axis=-1)
         s = np.concatenate([batch_y[i] for i in self.s_classes], axis=-1)
 
@@ -1601,11 +1558,7 @@ class DropDetection(tf.keras.utils.Sequence):
         p = np.clip(p, 0, 1)
         s = np.clip(s, 0, 1)
         n = np.clip(1 - p - s, 0, 1)
-        if self.beamlabel and 'ADD' in self.beamlabel :
-            y={'labels': np.concatenate([n, p, s], axis=-1),
-               'beams': np.concatenate([batch_y[-2], batch_y[-1]], axis=-1)}
-        #elif self.modeltype == 'splitoutputtransphasenet'  :
-        elif self.modeltype.startswith('splitoutput'):
+        if self.modeltype.startswith('splitoutput'):
             noise_p = np.clip(1 - p, 0, 1)
             noise_s = np.clip(1 - s, 0, 1)
             y = np.concatenate([noise_p, p, noise_s, s], axis=-1)
@@ -1956,7 +1909,6 @@ def create_data_generator(
         testing=not training,
         include_noise=include_noise,
         ramp=config.augment.ramp,
-        beamlabel=config.training.use_beam_as_label,
         holdout=holdout,
         modeltype=config.model.type,  # Pass modeltype from config
         smart_crop=smart_crop,  # Pass smart_crop from config
@@ -1971,7 +1923,6 @@ def create_data_generator(
                          p_classes=p_classes, 
                          s_classes=s_classes,
                          class_weights=config.training.class_weights,
-                         beamlabel=config.training.use_beam_as_label,
                          modeltype=config.model.type),nchannels
 
 def get_data_files(
@@ -2070,9 +2021,7 @@ def get_model(config: Any, nchannels: int) -> Callable:
         opt = opt(learning_rate=config.training.learning_rate, 
               weight_decay=config.training.weight_decay)
             
-    if config.training.use_beam_as_label and 'ADD' not in config.training.use_beam_as_label  : num_classes = 2
-    elif config.training.use_beam_as_label and 'ADD' in config.training.use_beam_as_label : num_classes = 5
-    elif config.model.type == 'splitoutputtransphasenet' : num_classes = 4
+    if config.model.type == 'splitoutputtransphasenet' : num_classes = 4
     elif config.model.type == 'splitoutputbranch': num_classes = 4
     elif config.model.type == 'splitoutputtransphasenetdepthwise': num_classes = 4
     elif config.model.type == 'splitoutputbranchdepthwise': num_classes = 4
@@ -2196,109 +2145,51 @@ def get_model(config: Any, nchannels: int) -> Callable:
 
     def create_model():
         model = model_class(**kw)
-        if config.training.use_beam_as_label :
-            #loss2 = tf.keras.losses.MeanSquaredError() # also check MAE, Huber,
-            loss2 = correlation_coefficient_loss
-            loss_weights = None
-            #metrics2 = tf.keras.metrics.MeanSquaredError()
-            metrics2 = correlation_coefficient
-            if 'ADD' not in config.training.use_beam_as_label :
-                loss = loss2
-                metrics = metrics2
 
-        if not config.training.use_beam_as_label or 'ADD' in config.training.use_beam_as_label:
-            if config.model.type.startswith('splitoutput'):
-                # Get losses and weights from config
-                loss, loss_weights = get_splitoutput_losses_and_weights(config)
+        if config.model.type.startswith('splitoutput'):
+            # Get losses and weights from config
+            loss, loss_weights = get_splitoutput_losses_and_weights(config)
 
-                # For the split-output network each branch (P, S) outputs a
-                # single probability value per time-sample (shape: [B,T,1]).
-                # Therefore we can feed the tensors directly to `keras_f1`
-                # without any channel slicing.
-                #def f1_scalar(yt, yp):
-                #    return keras_f1(tf.squeeze(yt, axis=-1), tf.squeeze(yp, axis=-1))
-                # But still need to the queezing!
-
-               # def f1_scalar(yt, yp):
-               #     yt = tf.cast(yt, tf.float32)
-               #     yp = tf.cast(yp, tf.float32)
-               #     # Drop the singleton channel without using squeeze (safer for unknown dims)
-               #     if yt.shape.rank == 3:
-               #         yt = yt[..., 0]   # (B, T, 1) -> (B, T)
-               #         yp = yp[..., 0]
-               #     # Ensure rank-2 shape even if static dims are None
-               #     yt = tf.reshape(yt, [tf.shape(yt)[0], -1])   # (B, T)
-               #     yp = tf.reshape(yp, [tf.shape(yp)[0], -1])
-               #     return keras_f1(yt, yp)
-
-                metrics = [
-                    [
-                        tf.keras.metrics.BinaryAccuracy(name='p_acc'),
-                        #tf.keras.metrics.MeanMetricWrapper(f1_scalar, name='p_f1'),
-                        tf.keras.metrics.MeanMetricWrapper(
-                        #lambda a, b: f1_scalar(a, b), name='f1_p'),
+            metrics = [
+                [
+                    tf.keras.metrics.BinaryAccuracy(name='p_acc'),
+                    tf.keras.metrics.MeanMetricWrapper(
                         lambda a, b: keras_f1(a[..., 0], b[..., 0]), name='f1_p'),
-                    ],
-                    [
-                        tf.keras.metrics.BinaryAccuracy(name='s_acc'),
-                        #tf.keras.metrics.MeanMetricWrapper(f1_scalar, name='s_f1'),
-                        tf.keras.metrics.MeanMetricWrapper(
-                        #lambda a, b: f1_scalar(a, b), name='f1_s'),
+                ],
+                [
+                    tf.keras.metrics.BinaryAccuracy(name='s_acc'),
+                    tf.keras.metrics.MeanMetricWrapper(
                         lambda a, b: keras_f1(a[..., 0], b[..., 0]), name='f1_s'),
-                    ],
-                ]
+                ],
+            ]
 
-                # Compile with two heads
-                model.compile(
-                    optimizer=opt,
-                    loss=loss,
-                    loss_weights=loss_weights,
-                    metrics=metrics,
-                    jit_compile=jit_compile_flag,
-                )
-                return model
-            else:
-                loss = tf.keras.losses.CategoricalCrossentropy()
-                loss_weights = None
-                metrics = [
-                    tf.keras.metrics.MeanMetricWrapper(
-                        lambda a, b: keras_f1(a[..., 1], b[..., 1]), name='f1_p'
-                    ),
-                    tf.keras.metrics.MeanMetricWrapper(
-                        lambda a, b: keras_f1(a[..., 2], b[..., 2]), name='f1_s'
-                    ),
-                ]
+            # Compile with two heads
+            model.compile(
+                optimizer=opt,
+                loss=loss,
+                loss_weights=loss_weights,
+                metrics=metrics,
+                jit_compile=jit_compile_flag,
+            )
+            return model
+        else:
+            loss = tf.keras.losses.CategoricalCrossentropy()
+            loss_weights = None
+            metrics = [
+                tf.keras.metrics.MeanMetricWrapper(
+                    lambda a, b: keras_f1(a[..., 1], b[..., 1]), name='f1_p'
+                ),
+                tf.keras.metrics.MeanMetricWrapper(
+                    lambda a, b: keras_f1(a[..., 2], b[..., 2]), name='f1_s'
+                ),
+            ]
 
-        if config.training.use_beam_as_label and 'ADD' in config.training.use_beam_as_label :
-            loss={
-                  'labels': loss,
-                  'beams': loss2 
-                 }
-            loss_weights={
-                  'labels': 0.5,
-                  'beams': 0.5
-                 }
-            metrics={
-                  'labels': metrics,
-                  'beams': metrics2
-                 }
-
-    
-        if not config.model.type.startswith('splitoutput'):
             model.compile(optimizer=opt,
                 loss=loss,
-                    loss_weights=loss_weights,
-                    sample_weight_mode="temporal",
-                    metrics=metrics)
-        else :
-            model.compile(
-            optimizer=opt,
-            loss=loss,
-            loss_weights=loss_weights,
-            metrics=metrics,
-            jit_compile=jit_compile_flag,
-        )
-        return model
+                loss_weights=loss_weights,
+                sample_weight_mode="temporal",
+                metrics=metrics)
+            return model
         
     return create_model()
 
@@ -2318,9 +2209,7 @@ def get_predictions(
     
     for x, y, sw in tqdm(test_dataset):
         xte.append(x)
-        if config.training.use_beam_as_label and 'ADD' in config.training.use_beam_as_label:
-            m = np.zeros((y['labels'].shape[0],))
-        elif config.model.type.startswith('splitoutput'):
+        if config.model.type.startswith('splitoutput'):
             # For split output, y is already [p_label, s_label]
             m = np.zeros((y[0].shape[0],))
         else:

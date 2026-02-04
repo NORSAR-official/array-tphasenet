@@ -104,6 +104,8 @@ python predict_on_testdata.py --config config_arrayarces_set2.yaml
 
 ## Detection on contineous data
 
+In the config files only ARCES and 1 hour of processing is chosen. SPITS array can be used for example. Edit and adapt.
+
 ### Single station detection (on ARA0):
 
 In config_1stat.yaml set:
@@ -143,6 +145,8 @@ prediction.detect_only : True
 
 ### Beam detection:
 
+Includes combining beams if : prediction.combine_beams : True
+
 ```
 python predict_contineous.py --config config_zbeam.yaml
 python predict_contineous.py --config config_3cbeam.yaml
@@ -150,11 +154,13 @@ python predict_contineous.py --config config_3cbeam.yaml
 
 ### Array detection:
 
+Only a model trained on ARCES is available.
+
 ```
 python predict_contineous.py --config config_arrayarces_set2.yaml
 ```
 
-## Evalution of contineous detection
+## Evaluation of contineous detection
 
 ```
 python evaluate_contineous.py --config <config-file-from-above>

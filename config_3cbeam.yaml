@@ -14,6 +14,8 @@ data:
   sampling_rate : 40.
   allowed_phases : ['PN', 'PG', 'P', 'SN', 'SG', 'S', 'PB', 'SB','D'] #  phase types to be used as labels
   holdout : False
+  lower_frequency : 2.0
+  upper_frequency : 8.0
 training:
   reduce_lr_patience: 9
   early_stopping_patience: 15
@@ -28,8 +30,6 @@ training:
   l1_norm: 0.0
   l2_norm: 0.0
   dropout: 0.4
-  probabilistic: False,
-  probabilistic_samples: 10,
 normalization:
   mode: 'std'
   channel_mode: 'global'
@@ -72,7 +72,7 @@ prediction:
   predict: True
   stations: ['ARCES']
   start_time: '2023-01-01T00:00:00'
-  end_time: '2023-01-05T00:00:00'
+  end_time: '2023-01-01T01:00:00'
   window_length: 3600
   step: 10 # sliding window step in seconds
   stacking: 'median'
@@ -82,7 +82,7 @@ prediction:
   save_picks: False
 # This option is also used for test data in case of ensemble detection
   combine_array_stations: False 
-  combine_beams: False
+  combine_beams: True
   detect_only: False 
   num_processes: 8 
   vote_threshold_p: 0.35

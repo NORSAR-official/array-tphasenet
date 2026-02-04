@@ -63,7 +63,7 @@ evaluation:
   save_fig: True # save evaluation figures
   overall_performance: True # compute metrics for overall performance using thresholds above
   vs_metadata: False # Generate plots with call and precision for : 'distance' 'station' or 'catalog'
-  snr_threshold: False # [2,99999] # False or values [minsnr,maxsnr]
+  snr_threshold: False # [2,99999] # False or values [minsnr,maxsnr]; not implemented for contineous data!
   unpicked : True # generate a plot to identify unlabeledd arrivals
   common_events_with_model: False # only use common event in test data sets with this given model
 #  common_events_with_model: 'zbeam_transphasenet'
@@ -77,7 +77,7 @@ prediction: # settings read when processing contineous data or when post-process
   arrays: {'ARCES':['AR*'],'SPITS':['SP*'],'FINES':['FI*'],'NORES':['NR*']} # dictionary of arrays with station list belonging to it
                                # two characters + wildcard is allowed to uniquely collect array stations. Needed only for ensemble detection.
   start_time: '2023-01-01T00:00:00'
-  end_time: '2023-01-05T00:00:00'
+  end_time: '2023-01-01T01:00:00'
   window_length: 3600 # seconds per prediction run and output file with predictions to be saved
   step: 10 # sliding window step in seconds
   stacking: 'median' # 'mean', 'median', 'std', or 'pc25' for combining overlapping time windows

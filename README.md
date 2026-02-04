@@ -4,13 +4,27 @@
 
 Code related to the submitted paper **Adapting deep learning phase detectors for seismic array processing**.
 
-!!This is work in progress and will be completed soon and latest until the paper is published. Some code and dummy data are still missing!!
+!!This is work in progress and there may be still bugs an incomplete descriptions. Feel free to reach out.!!
 
-Dummy training data from ARCES, SPITS and FINES arrays are provided. Complete test data and all models trained on complete training data will be uploaded here:
+## Preparations
+
+Dummy training data from ARCES, SPITS and FINES arrays are provided here on Github. Complete test data, models trained on complete training data, and test data predictions can be found here:
 
 https://doi.org/10.17605/OSF.IO/27FPK
 
-Tested setup for installation of required packages  :
+Due to file size limit of 5 GB, some files are split and need to be merged after download:
+
+```
+python split_data_for_repo.py merge --pattern "./Downloads/1statfullarray_2022_single_station_waveforms_000*.hdf5" --output data/1statfullarray_2022_single_station_waveforms.hdf5
+python split_data_for_repo.py merge --pattern "./Downloads/array25arces_2022_array_waveforms_000*.hdf5" --output data/arces25_2022_array_waveforms.hdf5
+```
+
+Due to overall size limit of 50 GB, test data predictions for array detection model are not uploaded, but can be produced using test data and model (see below). 
+
+Note that dummy data must be overwritten in data/ with downloaded data.
+
+
+Tested setup for installation of required packages :
 
 ```
 conda create -n test python=3.10.12
@@ -82,6 +96,12 @@ python train.py --config config_arrayarces_set2.yaml
 python evaluate_on_testdata.py --config config_arrayarces_set2.yaml
 ```
 
+For meanunful evaluation you need to generate test data predicitons (missing in data repository):
+
+```
+python predict_on_testdata.py --config config_arrayarces_set2.yaml
+```
+
 ## Detection on contineous data
 
 ### Single station detection (on ARA0):
@@ -121,7 +141,21 @@ Do not write detection time series for each station, but combine and write only 
 
 prediction.detect_only : True
 
-To be added:
-- evaluation of contineous processing results
-- contineous processing using beam detection
-- contineous processing using array detection
+### Beam detection:
+
+```
+python predict_contineous.py --config config_zbeam.yaml
+python predict_contineous.py --config config_3cbeam.yaml
+```
+
+### Array detection:
+
+```
+python predict_contineous.py --config config_arrayarces_set2.yaml
+```
+
+## Evalution of contineous detection
+
+```
+python evaluate_contineous.py --config <config-file-from-above>
+```

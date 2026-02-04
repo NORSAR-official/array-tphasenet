@@ -207,8 +207,6 @@ for i, testing_file in enumerate(testing_files[0]):
     # -----------------------------------------------------------------------
     
     # Redefine output naming (may differ from model loading path)
-    dataset = cfg.data.input_dataset_name
-    setting = f'{dataset}_{model_type}'
     
     if cfg.run.custom_outname:
         setting = f'{dataset}_{cfg.run.custom_outname}_{model_type}'

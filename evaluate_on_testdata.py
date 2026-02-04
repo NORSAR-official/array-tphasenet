@@ -317,15 +317,6 @@ if __name__ == '__main__':
         if only_selected_stations:
             print(f'Station filtering from config: {only_selected_stations}')
     
-    # Special handling for 'setX' placeholder in config filename
-    # Allows testing different array configurations without editing config files
-    if 'setX' in configfile:
-        setattr(cfg.data, "extract_array_channels", True)
-        setattr(cfg.data, "setname", 'arces_set3w3_2022test')
-#        setattr(cfg.data, "setname", 'arces_5stat_2022test')
-#        setattr(cfg.data, "setname", 'arces_set5w3_2022test')
-#        setattr(cfg.data, "setname", 'arces_set5r3_2022test')
-
     # Set default value for array channel extraction if not present
     if not hasattr(cfg.data, "extract_array_channels"): 
         setattr(cfg.data, "extract_array_channels", False)
@@ -362,11 +353,6 @@ if __name__ == '__main__':
     if cfg.run.predict_with_other_model :
         model += f'_{cfg.run.predict_with_other_model}'
 
-    # Add test year suffix to model name if applicable
-    # Skip for 2022 test, '3cbeam4' configs, and multi-year ranges
-    if '3cbeam4' not in configfile and ( '-' in str(cfg.data.test_years[0]) or ( len(cfg.data.test_years)==1 and  cfg.data.test_years[0] != 2022 )) :
-        model += f'_{cfg.data.test_years[0]}'
-    
     # Initialize suffix for additional output filename modifications
     suffix = ''
     if len(cfg.data.test_years)>1 :

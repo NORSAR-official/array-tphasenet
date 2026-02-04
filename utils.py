@@ -1047,7 +1047,7 @@ def get_max_beam(pred_stream, *, prefer='P_on_tie', return_meta=False):
     return st
 
 
-def combine_phase_detections(pred_stream,array,baz,cfg_pred,cfg,geometry=None,cont=False):
+def combine_phase_detections(pred_stream,baz,cfg_pred,cfg,geometry=None,cont=False):
     """
     Combine phase detections from multiple array elements.
     
@@ -1058,8 +1058,6 @@ def combine_phase_detections(pred_stream,array,baz,cfg_pred,cfg,geometry=None,co
     ----------
     pred_stream : obspy.Stream
         Stream of prediction traces from array stations
-    array : str
-        Array name (e.g., 'ARCES', 'FINES')
     baz : float or None
         Back-azimuth (degrees) for beamforming, None for grid search
     cfg_pred : namespace
@@ -1088,6 +1086,7 @@ def combine_phase_detections(pred_stream,array,baz,cfg_pred,cfg,geometry=None,co
     if cfg_pred.skip_stations :
         for stat in cfg_pred.skip_stations :
             for tr in pred_stream.select(station=stat):
+                print(f'Removing station {tr.stats.station}')
                 pred_stream.remove(tr)  
 
     if cfg_pred.combine_beams :
@@ -1254,9 +1253,9 @@ def group_and_combine_phase_detections(p_pred,s_pred,ids,ids_stat,stations,cfg,c
                 pred_stream += make_trace(stations[i],'S',np.squeeze(s_pred[i]),UTCDateTime(),cfg.data.sampling_rate)
             if cfg_pred.combine_array_stations == "beam" :
                 geometry = array_geometries.get(array) if array_geometries else None
-                st_comb=combine_phase_detections(pred_stream,array,baz[idx[0]],cfg_pred,cfg,geometry=geometry)
+                st_comb=combine_phase_detections(pred_stream,baz[idx[0]],cfg_pred,cfg,geometry=geometry)
             else :
-                st_comb=combine_phase_detections(pred_stream,array,False,cfg_pred,cfg)
+                st_comb=combine_phase_detections(pred_stream,False,cfg_pred,cfg)
             if len(st_comb.select(station=cfg_pred.combine_array_stations.upper()).select(channel='P')) == 0 : continue
             p_pred_new.append(st_comb.select(station=cfg_pred.combine_array_stations.upper()).select(channel='P')[0].data)
             s_pred_new.append(st_comb.select(station=cfg_pred.combine_array_stations.upper()).select(channel='S')[0].data)

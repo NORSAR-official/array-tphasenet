@@ -1426,8 +1426,7 @@ def preprocess_stream(stream, sampling_rate, bandpass=None, taper=0.01):
         Preprocessed stream
     """
     stream = stream.copy()
-    stream.detrend('demean')
-    stream.detrend('linear')
+    stream.detrend()
     stream.taper(taper)
     
     if bandpass is not None:
@@ -1577,6 +1576,32 @@ def create_detection_beams(stream, geometry, azimuths, p_velocities, s_velocitie
                     except ValueError as e:
                         print(f"  Warning: Could not create S beam at {azimuth}°, vel={s_vel}: {e}")
                         beams[key]['S'] = None
+                
+                # QC plot: show beams and input streams for this configuration
+                #if three_component:
+                #    plot_stream = Stream()
+                #    # Add beams for this key
+                #    if beams[key].get('P') is not None:
+                #        plot_stream += beams[key]['P']
+                #    if beams[key].get('S-T') is not None:
+                #        plot_stream += beams[key]['S-T']
+                #    if beams[key].get('S-R') is not None:
+                #        plot_stream += beams[key]['S-R']
+                #    plot_stream.plot(equal_scale=True) 
+                #    # Add input streams
+                #    plot_stream += stream_z
+                #    plot_stream += stream_r
+                #    plot_stream += stream_t
+                #else:
+                #    plot_stream = Stream()
+                #    if beams[key].get('P') is not None:
+                #        plot_stream += beams[key]['P']
+                #    if beams[key].get('S') is not None:
+                #        plot_stream += beams[key]['S']
+                #    plot_stream.plot(equal_scale=True)
+                #    plot_stream += stream_z
+                #print(f"Plotting beams for {key}")
+                #plot_stream.plot(equal_scale=False)
     
     return beams
 
@@ -1937,16 +1962,20 @@ def beam_phase_detection(client, cfg_pred, cfg_model):
             else:
                 azimuth, p_vel, s_vel = beam_key
             
+            # Get beam's actual starttime (accounts for time delay adjustment)
+            beam_starttime = beams[beam_key]['P'].stats.starttime
+            
             # Combine overlapping windows
+            # Use beam_starttime for proper timing alignment
             pred_padded = combine_output_from_sliding_windows(
-                pred, start, start + delta, cfg_model, cfg_pred
+                pred, beam_starttime, beam_starttime + delta, cfg_model, cfg_pred
             )
             pred_results[beam_key] = pred_padded
             
             # Save results
             if cfg_pred.save_prob:
                 output_times = np.arange(len(pred_padded)) / cfg_model.data.sampling_rate
-                output_times = [start + t for t in output_times]
+                output_times = [beam_starttime + t for t in output_times]
                 
                 # Include velocities in filename if multiple
                 if single_velocity:

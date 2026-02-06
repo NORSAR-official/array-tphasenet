@@ -203,7 +203,6 @@ def create_beam(
     obspy.Trace
         The stacked beam trace with stats:
         - beam_components: list of contributing station codes
-        - beam_weights: array of contribution counts per sample
     
     Raises
     ------
@@ -296,7 +295,6 @@ def create_beam(
     
     # Add beam-specific metadata
     beam.stats.beam_components = components
-    beam.stats.beam_weights = weights
     
     # Optionally trim to region where all traces contributed
     if slice_ends:

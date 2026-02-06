@@ -22,6 +22,29 @@ warnings.filterwarnings("ignore")
 
 plt.rcParams.update({'font.size': 15})
 
+def safe_array_split(arr, batch_size):
+    """
+    Safely split array into batches, handling cases where array is shorter than batch_size.
+    
+    Parameters
+    ----------
+    arr : numpy.ndarray
+        Array to split
+    batch_size : int
+        Size of each batch
+        
+    Returns
+    -------
+    list
+        List of array batches
+    """
+    num_batches = int(len(arr) / batch_size)
+    if num_batches > 0:
+        return np.array_split(arr[:num_batches * batch_size], num_batches)
+    else:
+        # If array is shorter than batch_size, return as single batch
+        return [arr]
+
 def add_ref_to_steam(pred_stream,stat,components,times,cfg):
     # adding reference for keeping same scale 0->1 in snuffler
     ref = np.ones(len(pred_stream[0].data))
@@ -90,17 +113,17 @@ if __name__ == '__main__':
 
         print("Reading hand-picked arrivals ...")
         p_true,s_true,ap_true,as_true = load_manual_picks(p_pred.shape,p_pred.shape,times,cfg.evaluation.picks)
-        p_true = np.array_split(p_true[:int(len(p_true)/batchlen)*batchlen],int(len(p_true)/batchlen))
-        s_true = np.array_split(s_true[:int(len(s_true)/batchlen)*batchlen],int(len(s_true)/batchlen))
-        ap_true = np.array_split(ap_true[:int(len(ap_true)/batchlen)*batchlen],int(len(ap_true)/batchlen))
-        as_true = np.array_split(as_true[:int(len(as_true)/batchlen)*batchlen],int(len(as_true)/batchlen))
+        p_true = safe_array_split(p_true, batchlen)
+        s_true = safe_array_split(s_true, batchlen)
+        ap_true = safe_array_split(ap_true, batchlen)
+        as_true = safe_array_split(as_true, batchlen)
         for stat in list(set([tr.stats.station for tr in pred_stream])) :
             if stat != 'X' and stat in cfg_pred.stations :
                 last_stat = stat
                 p_pred = pred_stream.select(station=stat).select(channel='P')[0].data
                 s_pred = pred_stream.select(station=stat).select(channel='S')[0].data
-                p_pred = np.array_split(p_pred[:int(len(p_pred)/batchlen)*batchlen],int(len(p_pred)/batchlen))
-                s_pred = np.array_split(s_pred[:int(len(s_pred)/batchlen)*batchlen],int(len(s_pred)/batchlen))
+                p_pred = safe_array_split(p_pred, batchlen)
+                s_pred = safe_array_split(s_pred, batchlen)
                 if cfg.evaluation.optimal_threshold :
                     print("Generating recall-precision curves for getting optimal threshold")
                     thr_opt_p,thr_opt_s,fig = plot_L_curve(p_true, p_pred, s_true, s_pred,
@@ -171,12 +194,12 @@ if __name__ == '__main__':
                 as_true_tmp = np.concatenate((as_true_tmp,as_true))
                 times_tmp = np.concatenate((times_tmp,times))
             times_split.append(times)
-        p_pred = np.array_split(p_pred_tmp[:int(len(p_pred_tmp)/batchlen)*batchlen],int(len(p_pred_tmp)/batchlen))
-        s_pred = np.array_split(s_pred_tmp[:int(len(s_pred_tmp)/batchlen)*batchlen],int(len(s_pred_tmp)/batchlen))
-        p_true = np.array_split(p_true_tmp[:int(len(p_true_tmp)/batchlen)*batchlen],int(len(p_true_tmp)/batchlen))
-        s_true = np.array_split(s_true_tmp[:int(len(s_true_tmp)/batchlen)*batchlen],int(len(s_true_tmp)/batchlen))
-        ap_true = np.array_split(ap_true_tmp[:int(len(ap_true_tmp)/batchlen)*batchlen],int(len(ap_true_tmp)/batchlen))
-        as_true = np.array_split(as_true_tmp[:int(len(as_true_tmp)/batchlen)*batchlen],int(len(as_true_tmp)/batchlen))
+        p_pred = safe_array_split(p_pred_tmp, batchlen)
+        s_pred = safe_array_split(s_pred_tmp, batchlen)
+        p_true = safe_array_split(p_true_tmp, batchlen)
+        s_true = safe_array_split(s_true_tmp, batchlen)
+        ap_true = safe_array_split(ap_true_tmp, batchlen)
+        as_true = safe_array_split(as_true_tmp, batchlen)
         times = times_tmp.copy()
 
         if cfg.evaluation.optimal_threshold :
@@ -236,5 +259,5 @@ if __name__ == '__main__':
         outdir = f'{cfg_pred.output_dir}/{model}{suffix}'
         os.makedirs(outdir, exist_ok=True)
         batchlen = int(3600*cfg.data.sampling_rate)
-        times = np.array_split(times[:int(len(times)/batchlen)*batchlen],int(len(times)/batchlen))
+        times = safe_array_split(times, batchlen)
         save_picks(p_pred,s_pred,times,cfg.data.sampling_rate,thr_opt_p,thr_opt_s,stationstr,outdir)

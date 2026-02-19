@@ -26,7 +26,6 @@ Main Components:
     - DepthwiseSplitOutputTransPhaseNet: Combines depthwise convolutions with split output for P and S phases.
     - SplitOutputTransPhaseNetBranch: Variant with shared decoder blocks before branching into P/S heads.
     - SplitOutputBranchDepthwise: Combines depthwise convolutions with branch-after-N decoder sharing.
-    - SplitOutputTransPhaseNet_old: Legacy dual-branch output model.
 
 Usage:
 ------
@@ -198,34 +197,6 @@ class TransformerBlock(tfl.Layer):
         self.layernorm2 = tfl.LayerNormalization(epsilon=1e-6)
         self.dropout1 = tfl.Dropout(rate)
         self.dropout2 = tfl.Dropout(rate)
-
-    def call_old(self, inputs, training):
-        """
-        Legacy call signature for the transformer block.
-
-        Parameters
-        ----------
-        inputs : list or tuple of tf.Tensor
-            Query and value tensors.
-        training : bool
-            Whether the call is in training mode.
-
-        Returns
-        -------
-        tf.Tensor
-            Output tensor after attention and feed-forward processing.
-        """
-        if isinstance(inputs, (list, tuple)):
-            query, value = inputs
-        else:
-            query, value = inputs, inputs
-
-        attn_output = self.att(query, value)
-        attn_output = self.dropout1(attn_output, training=training)
-        out1 = self.layernorm1(query + attn_output)
-        ffn_output = self.ffn(out1)
-        ffn_output = self.dropout2(ffn_output, training=training)
-        return self.layernorm2(out1 + ffn_output)
 
     def call(self, query, value=None, training=None):
         """
@@ -1125,8 +1096,8 @@ class TransPhaseNet(PhaseNet):
         Type of pooling layer. Default is 'max'.
     att_type : {'downstep', 'across'}, optional
         Attention type. Default is 'across'.
-    rnn_type : {'lstm', 'causal', 'depthwise'}, optional
-        Type of context modeling. Default is 'lstm'.
+    rnn_type : {'lstm', 'causal', 'depthwise', 'none'}, optional
+        Type of context modeling. 'none' skips RNN and goes straight to Transformer. Default is 'lstm'.
     additive_att : bool, optional
         If True, use additive attention. Default is True.
     stacked_layer : int, optional
@@ -1173,7 +1144,7 @@ class TransPhaseNet(PhaseNet):
             name (str, optional): model name. Defaults to 'PhaseNet'.
             att_type (str, optional): if the attention should work during downstep or across (self attention). 
             num_heads (int, optional): number of attention heads in transformer blocks. Defaults to 4.
-            rnn_type (str, optional): use "lstm" rnns or "causal" dilated conv.  
+            rnn_type (str, optional): use "lstm" rnns, "causal" dilated conv, "depthwise" conv, or "none" to skip RNN.  
         """
         super(TransPhaseNet, self).__init__(num_classes=num_classes, 
                                               filters=filters, 
@@ -1213,30 +1184,6 @@ class TransPhaseNet(PhaseNet):
         x = tfl.UpSampling1D(2)(x)
         return x
 
-    def _att_block_old(self, x, y, ra):
-        if self.rnn_type == 'lstm':
-            x = tfl.Bidirectional(tfl.LSTM(ra, return_sequences=True))(x)
-        elif self.rnn_type == 'causal':
-            x1 = ResidualConv1D(ra, 3, stacked_layer=self.stacked_layer, causal=True)(x)
-            x2 = ResidualConv1D(ra, 3, stacked_layer=self.stacked_layer, causal=True)(tf.reverse(x, axis=[1]))
-            x = tf.concat([x1, tf.reverse(x2, axis=[1])], axis=-1)
-        else:
-            raise NotImplementedError('rnn type:' + self.rnn_type + ' is not supported')
-        x = tfl.Conv1D(ra, 1, padding='same')(x)
-        
-        att = TransformerBlock(num_heads=8,
-                               key_dim=ra,
-                               ff_dim=ra*4,
-                               rate=self.dropout_rate)([x,y])
-        if self.num_transformers > 1:
-            for _ in range(1, self.num_transformers):
-                att = TransformerBlock(num_heads=8,
-                            key_dim=ra,
-                            ff_dim=ra*4,
-                            rate=self.dropout_rate)(att)
-        
-        return att
-
     def _att_block(self, x, y, ra):
         if self.rnn_type == 'lstm':
             x = tfl.Bidirectional(tfl.LSTM(ra, return_sequences=True))(x)
@@ -1259,6 +1206,9 @@ class TransPhaseNet(PhaseNet):
                 activation=self.activation,
                 dropout=self.dropout_rate,
             )(x)
+        elif self.rnn_type == 'none':
+            # Skip RNN layer, go straight to Transformer
+            pass
         else:
             raise NotImplementedError('rnn type:' + self.rnn_type + ' is not supported')
         x = tfl.Conv1D(ra, 1, padding='same')(x)
@@ -1413,7 +1363,7 @@ class DepthwiseTransPhaseNet(PhaseNet):
         Type of pooling layer. Default is 'max'.
     att_type : {'downstep', 'across'}, optional
         Attention type. Default is 'across'.
-    rnn_type : {'lstm', 'causal'}, optional
+    rnn_type : {'lstm', 'causal', 'depthwise', 'none'}, optional
         Type of context modeling. Default is 'lstm'.
     additive_att : bool, optional
         If True, use additive attention. Default is True.
@@ -1462,7 +1412,7 @@ class DepthwiseTransPhaseNet(PhaseNet):
             initializer (tf.keras.initializers.Initializer, optional): weight initializer. Defaults to 'glorot_normal'.
             name (str, optional): model name. Defaults to 'PhaseNet'.
             att_type (str, optional): if the attention should work during downstep or across (self attention). 
-            rnn_type (str, optional): use "lstm" rnns or "causal" dilated conv.  
+            rnn_type (str, optional): use "lstm" rnns, "causal" dilated conv, "depthwise" conv, or "none" to skip RNN.  
         """
         super(DepthwiseTransPhaseNet, self).__init__(
                                               num_channels=num_channels,
@@ -1662,7 +1612,7 @@ class SplitOutputTransPhaseNet(TransPhaseNet):
         Type of pooling layer. Default is 'max'.
     att_type : {'downstep', 'across'}, optional
         Attention type. Default is 'across'.
-    rnn_type : {'lstm', 'causal'}, optional
+    rnn_type : {'lstm', 'causal', 'depthwise', 'none'}, optional
         Type of context modeling. Default is 'lstm'.
     additive_att : bool, optional
         If True, use additive attention. Default is True.
@@ -1856,7 +1806,7 @@ class DepthwiseSplitOutputTransPhaseNet(DepthwiseTransPhaseNet):
         Type of pooling layer. Default is 'max'.
     att_type : {'downstep', 'across'}, optional
         Attention type. Default is 'across'.
-    rnn_type : {'lstm', 'causal'}, optional
+    rnn_type : {'lstm', 'causal', 'depthwise', 'none'}, optional
         Type of context modeling. Default is 'lstm'.
     additive_att : bool, optional
         If True, use additive attention. Default is True.
@@ -2060,7 +2010,7 @@ class SplitOutputBranchDepthwise(DepthwiseTransPhaseNet):
         Type of pooling layer. Default is 'max'.
     att_type : {'downstep', 'across'}, optional
         Attention type. Default is 'across'.
-    rnn_type : {'lstm', 'causal'}, optional
+    rnn_type : {'lstm', 'causal', 'depthwise', 'none'}, optional
         Type of context modeling. Default is 'lstm'.
     additive_att : bool, optional
         If True, use additive attention. Default is True.

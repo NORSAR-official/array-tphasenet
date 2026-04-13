@@ -79,11 +79,12 @@ prediction:
   predict: True 
   stations: ['ARCES']
   start_time: '2023-01-01T00:00:00'
-  end_time: '2023-01-05T00:00:00'
+  end_time: '2023-01-01T01:00:00'
   window_length: 3600
-  step: 10 
+#  step: 10 
+  step: 120
   stacking: 'median'
-  output_dir: './output/contineous/'
+  output_dir: './output/continuous/'
   save_prob: True 
   save_waveforms: False 
   save_picks: False 

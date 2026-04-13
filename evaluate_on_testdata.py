@@ -147,6 +147,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from omegaconf import OmegaConf
+import os
 from setup_config import get_config_dir, dict_to_namespace
 from utils import (
     calculate_residual, js_divergence, recall, precision, f1_score,
@@ -159,6 +160,53 @@ warnings.filterwarnings("ignore")
 
 # Set matplotlib font size for all plots
 plt.rcParams.update({'font.size': 13})
+
+
+def snapshot_png_files(search_dirs):
+    files = {}
+    for search_dir in search_dirs:
+        if not search_dir:
+            continue
+        root = os.path.abspath(os.path.expanduser(str(search_dir)))
+        if not os.path.isdir(root):
+            continue
+        for path in glob.glob(f"{root}/**/*.png", recursive=True):
+            abs_path = os.path.abspath(path)
+            try:
+                files[abs_path] = os.path.getmtime(abs_path)
+            except OSError:
+                continue
+    return files
+
+
+def show_png(path):
+    try:
+        image = plt.imread(path)
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.imshow(image)
+        ax.set_title(os.path.basename(path))
+        ax.axis("off")
+        plt.show()
+        plt.close(fig)
+    except Exception as exc:
+        print(f"[WARN] Could not display PNG {path}: {exc}")
+
+
+def report_produced_pngs(before, search_dirs, show_images=False):
+    after = snapshot_png_files(search_dirs)
+    produced_files = sorted(
+        path for path, mtime in after.items()
+        if path not in before or mtime > before[path]
+    )
+    print("Produced PNG files:")
+    if not produced_files:
+        print("- none")
+        return
+    for path in produced_files:
+        print(f"- {path}")
+    if show_images:
+        for path in produced_files:
+            show_png(path)
 
 def load_metadata(cfg, events):
     """
@@ -271,8 +319,14 @@ if __name__ == '__main__':
         default='config.yaml',
         help='Path to training configuration file, relative to working directory (default: config.yaml)'
     )
+    parser.add_argument(
+        '--show-produced-png',
+        action='store_true',
+        help='Display PNG files produced during this run at the end.'
+    )
     
     args = parser.parse_args()
+    show_produced_png = args.show_produced_png
     
     only_selected_stations = False
     
@@ -305,6 +359,8 @@ if __name__ == '__main__':
 
     
     print('Config read.')
+    png_search_dirs = [cfg.run.outputdir]
+    png_before = snapshot_png_files(png_search_dirs)
 
     # ═══════════════════════════════════════════════════════════════════════════
     # CONFIGURATION ADJUSTMENTS
@@ -616,23 +672,71 @@ if __name__ == '__main__':
         fout.writelines(text)
         fout.close()
         
-        # Plot residual distributions
+        # Plot residual distributions. For tiny dummy datasets, all residuals can
+        # be NaN; in that case create a placeholder figure instead of crashing.
         resp = calculate_residual(p_yte, p_pred,cfg,dt=dt, th=thr_opt_p)
         ress = calculate_residual(s_yte, s_pred,cfg,dt=dt, th=thr_opt_s)
-        plt.hist(resp,bins=1600,alpha=0.5,label='P waves')
-        plt.hist(ress,bins=1600,alpha=0.5,label='S waves')
-        plt.yscale('log')
-        plt.xlim(-10,10)
-        # Reference lines at 0 and ±2 seconds
-        plt.plot([0.0,0.0],[0.0,7000],linestyle='dashed',c='black',label=None)
-        plt.plot([-2.0,-2.0],[0.0,7000],linestyle='dashed',c='black',label=None)
-        plt.plot([2.0,2.0],[0.0,7000],linestyle='dashed',c='black',label=None)
-        plt.xlabel('Residual (s)')
-        plt.ylabel('Counts')
-        plt.legend()
-        if cfg.evaluation.save_fig : 
-            plt.savefig(f'{cfg.run.outputdir}/{eval_output_dir}/residuals_{model}{suffix}.png')
-        plt.show()
+
+        def finite_values(values):
+            out = []
+            for v in np.asarray(values).ravel():
+                try:
+                    vf = float(v)
+                except (TypeError, ValueError):
+                    continue
+                if np.isfinite(vf):
+                    out.append(vf)
+            return np.asarray(out, dtype=float)
+
+        resp_finite = finite_values(resp)
+        ress_finite = finite_values(ress)
+
+        if len(resp_finite) == 0 and len(ress_finite) == 0:
+            warn_msg = (
+                "[WARN] No finite residuals available (likely tiny dummy data). "
+                "Creating placeholder residual plot."
+            )
+            print(warn_msg)
+            try:
+                with open(f'{cfg.run.outputdir}/{eval_output_dir}/performance_{model}{suffix}.txt', 'a') as fout:
+                    fout.write('\n')
+                    fout.write(
+                        'Residual plot note: no finite residuals were available for this '
+                        'dataset/configuration; a placeholder figure was created.\n'
+                    )
+            except OSError:
+                pass
+            fig, ax = plt.subplots(figsize=(6, 4))
+            ax.text(
+                0.5,
+                0.5,
+                "No finite residuals available\nfor this dataset/configuration",
+                ha='center',
+                va='center',
+                fontsize=12,
+            )
+            ax.set_axis_off()
+            if cfg.evaluation.save_fig :
+                fig.savefig(f'{cfg.run.outputdir}/{eval_output_dir}/residuals_{model}{suffix}.png')
+            plt.show()
+            plt.close(fig)
+        else:
+            if len(resp_finite) > 0:
+                plt.hist(resp_finite, bins=1600, alpha=0.5, label='P waves')
+            if len(ress_finite) > 0:
+                plt.hist(ress_finite, bins=1600, alpha=0.5, label='S waves')
+            plt.yscale('log')
+            plt.xlim(-10,10)
+            # Reference lines at 0 and ±2 seconds
+            plt.plot([0.0,0.0],[0.0,7000],linestyle='dashed',c='black',label=None)
+            plt.plot([-2.0,-2.0],[0.0,7000],linestyle='dashed',c='black',label=None)
+            plt.plot([2.0,2.0],[0.0,7000],linestyle='dashed',c='black',label=None)
+            plt.xlabel('Residual (s)')
+            plt.ylabel('Counts')
+            plt.legend()
+            if cfg.evaluation.save_fig : 
+                plt.savefig(f'{cfg.run.outputdir}/{eval_output_dir}/residuals_{model}{suffix}.png')
+            plt.show()
 
     # ═══════════════════════════════════════════════════════════════════════════
     # THEORETICAL ARRIVAL COMPARISON (OPTIONAL)
@@ -913,3 +1017,5 @@ if __name__ == '__main__':
         if cfg.evaluation.save_fig :
             plt.savefig(f'{cfg.run.outputdir}/{eval_output_dir}/missing_picks_{model}{suffix}.png')
         plt.show()
+
+    report_produced_pngs(png_before, png_search_dirs, show_images=show_produced_png)

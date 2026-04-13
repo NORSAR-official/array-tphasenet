@@ -20,8 +20,8 @@ training:
   reduce_lr_patience: 9
   early_stopping_patience: 15
   epochs: 200
-#  batch_size: 32
-  batch_size: 10 # for the dummy data set on GitHub
+  batch_size: 64 # for prediction with osv data
+#  batch_size: 10 # for the dummy data set on GitHub
   weight_decay: 0.1
   learning_rate: 0.001
   class_weights: [0.05,0.40,0.55] # noise, P, S
@@ -71,7 +71,7 @@ evaluation:
 prediction:
   # Settings for ensemble and beam detection and continuous prediction
   predict: True
-#  stations: ['ARCES'] # Array for contineous detection; if array name, all array stations are used
+#  stations: ['ARCES'] # Array for continuous detection; if array name, all array stations are used
   stations: ['ARCES','SPITS','FINES','NORES'] # List of arrays required when using ensemble detection on test data with mutiple arrays.
   arrays: {'ARCES':['AR*'],'SPITS':['SP*'],'FINES':['FI*'],'NORES':['NR*']}
   start_time: '2023-01-01T00:00:00'
@@ -79,7 +79,7 @@ prediction:
   window_length: 3600
   step: 10
   stacking: 'median'
-  output_dir: './output/contineous/'
+  output_dir: './output/continuous/'
   save_prob: True
   save_waveforms: False
   save_picks: False

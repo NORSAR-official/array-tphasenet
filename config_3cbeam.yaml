@@ -66,7 +66,7 @@ evaluation:
 #  snr_mode: 'max' # use max SNR of all arrivals from an event and keep all if above threshold
 #  snr_mode: 'min' # use min SNR of all arrivals from an event and keep all if above threshold
   common_events_with_model: False
-  picks : './data/manual_picks_arces.data'
+  picks : './data/manual_picks_arces.dat'
   theoretical_arrivals : False
 prediction:
   predict: True
@@ -74,9 +74,10 @@ prediction:
   start_time: '2023-01-01T00:00:00'
   end_time: '2023-01-01T01:00:00'
   window_length: 3600
-  step: 10 # sliding window step in seconds
+  #step: 10 # sliding window step in seconds
+  step: 120
   stacking: 'median'
-  output_dir: './output/contineous/'
+  output_dir: './output/continuous/'
   save_prob: True 
   save_waveforms: False
   save_picks: False

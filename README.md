@@ -1,167 +1,98 @@
-<a name="readme-top"></a>
-
 # Array phase detection using TPhaseNet models
 
-Code related to the submitted paper **Adapting deep learning phase detectors for seismic array processing**.
+Code and configurations for the paper **Adapting deep learning phase detectors for seismic array processing**.
 
-!!This is work in progress and there may be still bugs an incomplete descriptions. Feel free to reach out.!!
+## Data, Setup, and Reproduction
 
-## Preparations
+This repository contains code, scripts, configs, and small dummy data for quick checks.  
+Full-size 2022 test data, pre-trained models, and test predictions are distributed separately at OSF:
 
-Dummy training data from ARCES, SPITS and FINES arrays are provided here on Github. Complete test data, models trained on complete training data, and test data predictions can be found here:
+[https://doi.org/10.17605/OSF.IO/27FPK](https://doi.org/10.17605/OSF.IO/27FPK)
 
-https://doi.org/10.17605/OSF.IO/27FPK
+Important scope note: the OSF bundle does not include the full multi-year training
+corpus used for model development. It does include the released pre-trained models
+that were trained on the full training data.
 
-Due to file size limit of 5 GB, some files are split and need to be merged after download:
+OSF helper scripts are included for automated artifact download/prep:
 
-```
-python split_data_for_repo.py merge --pattern "./Downloads/1statfullarray_2022_single_station_waveforms_000*.hdf5" --output data/1statfullarray_2022_single_station_waveforms.hdf5
-python split_data_for_repo.py merge --pattern "./Downloads/array25arces_2022_array_waveforms_000*.hdf5" --output data/arces25_2022_array_waveforms.hdf5
-```
+- `bash scripts/prepare_osf_data.sh` downloads `.hdf5` data files and merges known split chunks into `data/`.
+- `bash scripts/prepare_osf_artifacts.sh` downloads `saved_model_*.tf` and `predictions_*.npz` into `output/models/` and `output/predictions/`.
 
-Due to overall size limit of 50 GB, test data predictions for array detection model are not uploaded, but can be produced using test data and model (see below). 
+## Environment setup
 
-Note that dummy data must be overwritten in data/ with downloaded data.
+Use the repository environment file:
 
-
-Tested setup for installation of required packages :
-
-```
-conda create -n test python=3.10.12
-conda activate test
-pip3 install -r requirements.txt
-
+```bash
+conda env create -f environment.yml
+conda activate array-tphasenet-test
 ```
 
-Edit config file to choose type of input data, type of model, etc.
-Several model config files are also provided.
+## Simple Reproducibility Pipeline
 
-Note that only config_1stat.yaml includes complete explanations for each parameter.
+Use the preflight checker before running expensive stages:
 
-## Single station detection
-
-Train model on single station data (explanation of output files will be added):
-
-```
-python train.py --config config_1stat.yaml
-
+```bash
+python scripts/check_inputs.py --config config_1stat.yaml --stage benchmark
 ```
 
-If you want to train on a more complete dataset, download data from link above (same for al other models below).
+Available `--stage` options:
 
-Create evaluation metrics and plots on test data:
+- `benchmark`: full reproducibility preflight (train + metadata checks)
+- `train`: checks training/validation/test input files
+- `predict-test`: checks test input files and required trained model
+- `evaluate-test`: checks metadata and test prediction files
+- `predict-continuous`: checks model availability for continuous prediction
+- `evaluate-continuous`: checks manual picks and continuous prediction outputs
 
-To generate meaningful results, you should download the test data predictions (year 2022) from the data repository and save under output/predictions/.
+`scripts/reproduce_benchmark.sh` runs `scripts/check_inputs.py` internally for  
+each stage it executes (disable with `--skip-preflight`).
 
-```
-python evaluate_on_testdata.py --config config_1stat.yaml
+Run the standard reproducibility pipeline with one command:
 
-```
-
-## Ensemble detection
-
-Apply single station model to all array stations in test data for ensemble detection:
-
-To generate meaningful results, you should download the model trained on multy year data from the data repository and save under output/models/.
-
-
-```
-python predict_on_testdata.py --config config_1statfullarray.yaml
-
+```bash
+bash scripts/reproduce_benchmark.sh --config config_1stat.yaml
 ```
 
-Combining single station output for ensemble detection is done in evaluation script:
+This script runs all stages listed above in order: `train`, `predict-test`,  
+`evaluate-test`, `predict-continuous`, and `evaluate-continuous`.
 
-```
-python evaluate_on_testdata.py --config config_1statfullarray.yaml
-```
+If `run.only_predict: true` is set in the selected config (for example  
+`config_1statfullarray.yaml for ensemble detection`), the `train` stage is skipped automatically and  
+the pipeline starts from `predict-test`. Otherwise, `train` already produced test predictions and `predict-test` is skipped automatically.
 
-## Beam detection:
+The bundled repository data is a small dummy subset intended only for smoke
+tests. Results from test-data evaluation and continuous prediction/evaluation on
+this dummy data are not scientifically usable.
 
-Train two beam detection models (vertical ad three-component beams) and evaulate on test data:
+For array processing (instead of single-station processing), use one of these
+array config files:
 
-```
-python train.py --config config_zbeam.yaml
-python train.py --config config_3cbeam.yaml
-python evaluate_on_testdata.py --config config_zbeam.yaml
-python evaluate_on_testdata.py --config config_3cbeam.yaml
-```
+- `Ensembel detection: config_1statfullarray.yaml`
+- `Beam detection with vertical component beams: config_zbeam.yaml`
+- `Beam detection with three-component beams: config_3cbeam.yaml`
+- `Array detection (ARCES only): config_arrayarces_set2.yaml`
 
-## Array detection:
+## Training and Testing with Full 2022 Data
 
-Train the array detection model (ARCES array using Set 2 - see paper) and evaluate on test data:
+Comprehensive notebook walkthrough including OSF prep and stage-by-stage commands:
 
-```
-python train.py --config config_arrayarces_set2.yaml
-python evaluate_on_testdata.py --config config_arrayarces_set2.yaml
-```
+- `notebooks/reproduce_main_results_walkthrough.ipynb`
 
-For meanunful evaluation you need to generate test data predicitons (missing in data repository):
+## Smoke tests
 
-```
-python predict_on_testdata.py --config config_arrayarces_set2.yaml
-```
+Run local smoke tests (test suite in tests/) to check core functionality and wiring, and that the repository is healthy:
 
-## Detection on contineous data
-
-In the config files only ARCES and 1 hour of processing is chosen. SPITS array can be used for example. Edit and adapt.
-
-### Single station detection (on ARA0):
-
-In config_1stat.yaml set:
-
-prediction.predict : True # run on contineous data
-
-prediction.combine_array_stations : False # no post-processing (only done for ensemble and beam detection)
-
-prediction.detect_only : False # If True will not write out continoues detection time series
-
-prediction.stations: ['ARA0']
-
-
-```
-python predict_contineous.py --config config_1stat.yaml
+```bash
+pytest -m smoke -q
 ```
 
-### Ensemble detection:
+## Full Reproduction Guide
 
-Do the detection on all array elements with single station detection model:
+For complete workflow details (artifact mapping, stage-by-stage commands, and
+continuous-data notes), see:
 
-Im model_configs/config_1stat.yaml set :
+- `docs/reproduce_main_results.md`
 
-prediction.predict : True # run on contineous data
+For configuration key explanations and choosing the right config file, see:
 
-prediction.combine_array_stations : 'stack' # do post-processing (stacking)
-
-prediction.stations: ['ARCES'] # use all ARCES stations
-
-```
-python predict_contineous.py --config config_1statfullarray_cont.yaml
-```
-
-Do not write detection time series for each station, but combine and write only phase detectiobs (only works for stacking option):
-
-prediction.detect_only : True
-
-### Beam detection:
-
-Includes combining beams if : prediction.combine_beams : True
-
-```
-python predict_contineous.py --config config_zbeam.yaml
-python predict_contineous.py --config config_3cbeam.yaml
-```
-
-### Array detection:
-
-Only a model trained on ARCES is available.
-
-```
-python predict_contineous.py --config config_arrayarces_set2.yaml
-```
-
-## Evaluation of contineous detection
-
-```
-python evaluate_contineous.py --config <config-file-from-above>
-```
+- `docs/config_reference.md`

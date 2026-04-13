@@ -1,0 +1,26 @@
+name: smoke-tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      MPLBACKEND: Agg
+      TF_CPP_MIN_LOG_LEVEL: "2"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup conda environment
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-activate-base: false
+          activate-environment: array-tphasenet
+          environment-file: environment.yml
+
+      - name: Run smoke tests
+        run: conda run -n array-tphasenet pytest -m smoke -q

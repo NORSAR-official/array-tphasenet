@@ -15,7 +15,7 @@ data:
   sampling_rate : 40. # common waveform sampling rate of training data
   allowed_phases : ['PN', 'PG', 'P', 'SN', 'SG', 'S', 'PB', 'SB'] #  phase types to be used as labels
   holdout : False # file with list of event IDs to be hold out during training and used during testing.
-# for contineous prediction we need info about data used for training. Data in hdf5 are already pre-filtered-
+# for continuous prediction we need info about data used for training. Data in hdf5 are already pre-filtered-
   lower_frequency : 2.0
   upper_frequency : 8.0
 training:
@@ -55,24 +55,24 @@ model:
   rnn_type: 'lstm'
   additive_att: False
 evaluation:
-  optimal_threshold: False # produces recall-precision to find optimal propability threshold for detection
+  optimal_threshold: True # produces recall-precision to find optimal propability threshold for detection
   dt: 2.0 # time tolerance for matching true and predicted labels
-  dt_cont: 4.0 # time tolerance for matching true and predicted labels for contineous data
+  dt_cont: 4.0 # time tolerance for matching true and predicted labels for continuous data
   p_threshold: 0.55 # fixed propability threshold for P wave detection
   s_threshold: 0.45 # fixed propability threshold for S waves
   save_fig: True # save evaluation figures
   overall_performance: True # compute metrics for overall performance using thresholds above
   vs_metadata: False # Generate plots with call and precision for : 'distance' 'station' or 'catalog'
-  snr_threshold: False # [2,99999] # False or values [minsnr,maxsnr]; not implemented for contineous data!
+  snr_threshold: False # [2,99999] # False or values [minsnr,maxsnr]; not implemented for continuous data!
   unpicked : True # generate a plot to identify unlabeledd arrivals
   common_events_with_model: False # only use common event in test data sets with this given model
 #  common_events_with_model: 'zbeam_transphasenet'
   snr_mode: 'max' # use max SNR of all arrivals from an event and keep all if above threshold
 #  snr_mode: 'min' # use min SNR of all arrivals from an event and keep all if above threshold
-  picks : './data/manual_picks_arces.data' # file with ground-true picks for contineous data
+  picks : './data/manual_picks_arces.dat' # file with ground-true picks for continuous data
   theoretical_arrivals : True # for calculating precision, use theoretical Pn,Pg,Sn and Sg arrivals as true labels
-prediction: # settings read when processing contineous data or when post-processing test data predictions
-  predict: True # process contineous waveforms. If False read previous output.
+prediction: # settings read when processing continuous data or when post-processing test data predictions
+  predict: True # process continuous waveforms. If False read previous output.
   stations: ['ARA0'] # if array name, all array stations are used
   arrays: {'ARCES':['AR*'],'SPITS':['SP*'],'FINES':['FI*'],'NORES':['NR*']} # dictionary of arrays with station list belonging to it
                                # two characters + wildcard is allowed to uniquely collect array stations. Needed only for ensemble detection.
@@ -81,7 +81,7 @@ prediction: # settings read when processing contineous data or when post-process
   window_length: 3600 # seconds per prediction run and output file with predictions to be saved
   step: 10 # sliding window step in seconds
   stacking: 'median' # 'mean', 'median', 'std', or 'pc25' for combining overlapping time windows
-  output_dir: './output/contineous/'
+  output_dir: './output/continuous/'
   save_prob: True # save continuous output probabilities
   save_waveforms: False # save continuous waveforms
   save_picks: False # save detections above threshold

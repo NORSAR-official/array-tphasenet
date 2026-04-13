@@ -71,15 +71,16 @@ evaluation:
 prediction:
   # Settings for ensemble and beam detection and continuous prediction
   predict: True
-#  stations: ['ARCES'] # Array for contineous detection; if array name, all array stations are used
+#  stations: ['ARCES'] # Array for continuous detection; if array name, all array stations are used
   stations: ['ARCES'] # List of arrays required when using ensemble detection on test data with mutiple arrays.
   arrays: {'ARCES':['AR*'],'SPITS':['SP*'],'FINES':['FI*'],'NORES':['NR*']}
   start_time: '2023-01-01T00:00:00'
   end_time: '2023-01-01T01:00:00'
   window_length: 3600
-  step: 10
+  #step: 10
+  step: 120 # to speed up testing
   stacking: 'median'
-  output_dir: './output/contineous/'
+  output_dir: './output/continuous/'
   save_prob: True
   save_waveforms: False
   save_picks: False

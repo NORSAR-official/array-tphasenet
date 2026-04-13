@@ -1,7 +1,0 @@
-tensorflow==2.12.1
-matplotlib
-tqdm
-scipy
-omegaconf
-pandas
-obspy

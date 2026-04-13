@@ -1073,7 +1073,7 @@ def combine_phase_detections(pred_stream,baz,cfg_pred,cfg,geometry=None,cont=Fal
     geometry : dict or None, default=None
         Station geometry for beamforming as {station_code: {'dx': km, 'dy': km}}.
         Required if combine_array_stations is 'beam'.
-    cont : True if evaluation on contineous data
+    cont : True if evaluation on continuous data
     
     Returns
     -------

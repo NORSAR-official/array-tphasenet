@@ -385,8 +385,22 @@ except tf.errors.InvalidArgumentError as e:
 print("\n" + "="*80)
 print("STARTING TRAINING")
 print("="*80)
-print(f"Training samples: {len(train_dataset)}")
-print(f"Validation samples: {len(valid_dataset)}")
+train_batches = len(train_dataset)
+valid_batches = len(valid_dataset)
+train_events = None
+valid_events = None
+
+if hasattr(train_dataset, "super_sequence") and hasattr(train_dataset.super_sequence, "data"):
+    train_events = len(train_dataset.super_sequence.data)
+if hasattr(valid_dataset, "super_sequence") and hasattr(valid_dataset.super_sequence, "data"):
+    valid_events = len(valid_dataset.super_sequence.data)
+
+if train_events is not None:
+    print(f"Training events: {train_events}")
+print(f"Training batches per epoch: {train_batches}")
+if valid_events is not None:
+    print(f"Validation events: {valid_events}")
+print(f"Validation batches per epoch: {valid_batches}")
 print(f"Epochs: {cfg.training.epochs}")
 print(f"Batch size: {cfg.training.batch_size}")
 print("="*80 + "\n")

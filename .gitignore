@@ -1,0 +1,19 @@
+strip_predictions.py
+output/
+outputs/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Local config variants (machine-specific)
+**/config*local*.yaml
+**/config*local*.yml
+
+# Local helper / scratch files to keep untracked
+README.original.md
+config.yaml
+notebooks/.ipynb_checkpoints/

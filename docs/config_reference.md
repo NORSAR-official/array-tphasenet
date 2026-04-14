@@ -86,7 +86,7 @@ Controls training-time data augmentation:
 
 ### 3.6 `model`
 
-- `type`: model architecture name (for example `transphasenet`, `splitoutput*`)
+- `type`: model architecture name (for example `transphasenet`)
 - `filters`, `kernel_sizes`, `pooling_type`
 - `activation`, `att_type`, `rnn_type`, `additive_att`
 - `residual_attention`: architecture depth/attention schedule

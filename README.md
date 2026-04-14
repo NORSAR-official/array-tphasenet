@@ -2,6 +2,11 @@
 
 Code and configurations for the paper **Adapting deep learning phase detectors for seismic array processing**.
 
+## Documentation
+
+- [Reproduce Main Results](docs/reproduce_main_results.md)
+- [Configuration Reference](docs/config_reference.md)
+
 ## Data, Setup, and Reproduction
 
 This repository contains code, scripts, configs, and small dummy data for quick checks.  
@@ -91,8 +96,8 @@ pytest -m smoke -q
 For complete workflow details (artifact mapping, stage-by-stage commands, and
 continuous-data notes), see:
 
-- `docs/reproduce_main_results.md`
+- [docs/reproduce_main_results.md](docs/reproduce_main_results.md)
 
 For configuration key explanations and choosing the right config file, see:
 
-- `docs/config_reference.md`
+- [docs/config_reference.md](docs/config_reference.md)

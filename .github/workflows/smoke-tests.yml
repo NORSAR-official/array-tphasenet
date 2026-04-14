@@ -11,6 +11,7 @@ jobs:
     env:
       MPLBACKEND: Agg
       TF_CPP_MIN_LOG_LEVEL: "2"
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -18,9 +19,10 @@ jobs:
       - name: Setup conda environment
         uses: conda-incubator/setup-miniconda@v3
         with:
-          auto-activate-base: false
-          activate-environment: array-tphasenet
+          auto-activate: false
+          activate-environment: array-tphasenet-test
           environment-file: environment.yml
+          conda-remove-defaults: "true"
 
       - name: Run smoke tests
-        run: conda run -n array-tphasenet pytest -m smoke -q
+        run: conda run -n array-tphasenet-test python -m pytest -m smoke -q

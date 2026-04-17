@@ -877,6 +877,27 @@ def phase_detection(client, cfg_pred, cfg_model, cfg_data):
                         t=times,
                         y=pred_padded
                     )
+                
+                if cfg_pred.save_picks:
+                    pred_array = np.array(pred_padded)
+                    if cfg_model.model.type.startswith('splitoutput'):
+                        p_pred_tmp, s_pred_tmp = np.split(pred_array, 2, axis=-1)
+                    else:
+                        _, p_pred_tmp, s_pred_tmp = np.split(pred_array, 3, axis=-1)
+                    
+                    p_pred = np.array([np.squeeze(p_pred_tmp)])
+                    s_pred = np.array([np.squeeze(s_pred_tmp)])
+                    times_pick = np.arange(p_pred.shape[-1]) / cfg_model.data.sampling_rate
+                    times_pick = np.array([[start + t for t in times_pick]])
+                    
+                    outdir = f'{folder}/picks'
+                    os.makedirs(outdir, exist_ok=True)
+                    save_picks(
+                        p_pred, s_pred, times_pick, cfg_model.data.sampling_rate,
+                        cfg_model.evaluation.p_threshold, cfg_model.evaluation.s_threshold,
+                        f'{station}_{event_time_stripped}',
+                        outdir
+                    )
 
 
 def combine_output_from_sliding_windows(pred, start, end, cfg_model, cfg_pred):
@@ -1998,7 +2019,7 @@ def beam_phase_detection(client, cfg_pred, cfg_model):
             all_preds = list(pred_results.values())
             
             if len(all_preds) > 0:
-                # Take maximum across all azimuths
+                # Take maximum across all beams
                 combined = np.max(np.array(all_preds), axis=0)
                 
                 if cfg_model.model.type.startswith('splitoutput'):

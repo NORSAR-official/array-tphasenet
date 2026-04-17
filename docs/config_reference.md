@@ -126,7 +126,8 @@ windowing (`window_length` is seconds per prediction/output chunk)
 continuous outputs (probabilities, waveforms, thresholded picks)
 - `combine_array_stations`: multi-station combination for ensemble detection workflow (`stack`, `vote`, `beam`, or `false`)
 - `combine_beams`: combine beam outputs into max-beam series for beam detection workflow
-- `detect_only`: skip per-station probability outputs and directly combine/save picks
+- `detect_only`: skip station / beam probability output combination from output files for ensemble and beam detection and directly combine stations / beams and save picks
+   Note that evaluation scripts require probability outputs.
 - `num_processes`: number of parallel workers used in detect-only mode
 - `p_beam_vel`, `s_beam_vel`: apparent velocities for beamforming
 - `vote_threshold_p`, `vote_threshold_s`: phase-specific thresholds for vote-based combination

@@ -101,3 +101,16 @@ continuous-data notes), see:
 For configuration key explanations and choosing the right config file, see:
 
 - [docs/config_reference.md](docs/config_reference.md)
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Contact
+
+Andreas Köhler - andreas.kohler@norsar.no - [ORCID](https://orcid.org/0000-0002-1060-7637)
+
+## Acknowledgments
+
+* Models are built with [TensorFLow](https://www.tensorflow.org/)
+* ARCES and SPITS waveform data are available via the [Norwegian EIDA node](https://eida.geo.uib.no/webdc3/)
